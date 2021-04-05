@@ -12,6 +12,8 @@ use crate::ui::*;
 use crate::util::get_window_size;
 use crate::net::{Message, Peer};
 
+const WALLHACKD_VERSION: &str = "1.0.2";
+
 #[derive(Debug)]
 enum Status {
     None,
@@ -62,7 +64,7 @@ impl State {
             assets,
             ui: Ui::new(),
             nickname_field: TextField::new(Some("[tWHD] Anon")),
-            matchmaker_field: TextField::new(Some("localhost:62137")),
+            matchmaker_field: TextField::new(Some(option_env!("WHD_NC_SERVER").unwrap_or("localhost:62137"))),
             room_id_field: TextField::new(None),
             join_expand: Expand::new(true),
             host_expand: Expand::new(false),
@@ -83,7 +85,7 @@ impl State {
     }
 
     fn process_header(&mut self, canvas: &mut Canvas) {
-        self.ui.push_group((self.ui.width(), 72.0), Layout::Vertical);
+        self.ui.push_group((self.ui.width(), 92.0), Layout::Vertical);
 
         self.ui.push_group((self.ui.width(), 56.0), Layout::Freeform);
         self.ui.set_font_size(48.0);
@@ -360,9 +362,19 @@ impl State {
                     Status::Info(text) | Status::Error(text) => text,
                 };
             self.ui.text(canvas, text, color, (AlignH::Left, AlignV::Middle));
+
             self.ui.pop_group();
             self.ui.pop_group();
         }
+
+        self.ui.push_group((self.ui.width(), 120.0), Layout::Vertical);
+        self.ui.text(canvas, format!("Netcanv {}", env!("CARGO_PKG_VERSION")).as_str(), self.assets.colors.text_field.text_hint, (AlignH::Left, AlignV::Bottom));
+        self.ui.pop_group();
+
+        self.ui.push_group((self.ui.width(), 20.0), Layout::Vertical);
+        self.ui.text(canvas, format!("WallhackD {}", WALLHACKD_VERSION).as_str(), self.assets.colors.text_field.text_hint, (AlignH::Left, AlignV::Bottom));
+        self.ui.pop_group();
+
     }
 
     fn validate_nickname(nickname: &str) -> Result<(), Status> {
@@ -438,7 +450,7 @@ impl AppState for State {
         self.ui.pad((64.0, 64.0));
 
         self.ui.push_group((self.ui.width(), 384.0), Layout::Vertical);
-        self.ui.align((AlignH::Left, AlignV::Middle));
+        //self.ui.align((AlignH::Left, AlignV::Middle));
         self.process_header(canvas);
         self.ui.space(24.0);
         self.process_menu(canvas, input);

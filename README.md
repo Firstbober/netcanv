@@ -1,3 +1,11 @@
+## WallhackD
+
+### Changes
+- Dark theme
+- Pasting images
+- Custom Room ID with Wallhackd Matchmaker
+- WHD_NC_SERVER env var for changing server without entering text
+
 # NetCanv
 
 This repository hosts source code for my YouTube tutorial series for a
