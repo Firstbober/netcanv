@@ -12,6 +12,9 @@ const INFO_SVG: &[u8] = include_bytes!("assets/icons/info.svg");
 const ERROR_SVG: &[u8] = include_bytes!("assets/icons/error.svg");
 const SAVE_SVG: &[u8] = include_bytes!("assets/icons/save.svg");
 
+const ADD_PHOTO_ALTERNATE: &[u8] = include_bytes!("assets/icons/add-photo-alternate.svg");
+const REPLAY: &[u8] = include_bytes!("assets/icons/replay.svg");
+
 pub struct ColorScheme {
     pub text: Color,
     pub panel: Color,
@@ -35,10 +38,16 @@ pub struct FileIcons {
     pub save: Image,
 }
 
+pub struct WallhackdIcons {
+    pub load_image: Image,
+    pub draw_it_again: Image
+}
+
 pub struct Icons {
     pub expand: ExpandIcons,
     pub status: StatusIcons,
     pub file: FileIcons,
+    pub wallhackd: WallhackdIcons
 }
 
 pub struct Assets {
@@ -90,6 +99,10 @@ impl Assets {
                 file: FileIcons {
                     save: Self::load_icon(SAVE_SVG),
                 },
+                wallhackd: WallhackdIcons {
+                    load_image: Self::load_icon(ADD_PHOTO_ALTERNATE),
+                    draw_it_again: Self::load_icon(REPLAY)
+                }
             },
         }
     }
@@ -99,39 +112,41 @@ impl Assets {
 impl ColorScheme {
 
     pub fn light() -> Self {
+        let accent = 0xffFF9800;
+
         Self {
-            text: Color::new(0xff000000),
-            panel: Color::new(0xffeeeeee),
+            text: Color::new(0xffeeeeee),
+            panel: Color::new(0xc5141414),
             panel2: Color::new(0xffffffff),
-            separator: Color::new(0xff202020),
+            separator: Color::new(0xffFF5722),
             error: Color::new(0xff7f0000),
 
             button: ButtonColors {
-                outline: Color::new(0x40000000),
-                text: Color::new(0xff000000),
-                hover: Color::new(0x20000000),
-                pressed: Color::new(0x50000000),
-            },
-            tool_button: ButtonColors {
-                outline: Color::new(0x00000000),
-                text: Color::new(0xff000000),
-                hover: Color::new(0x20000000),
-                pressed: Color::new(0x50000000),
-            },
-            slider: Color::new(0xff000000),
-            expand: ExpandColors {
-                icon: Color::new(0xff000000),
-                text: Color::new(0xff000000),
+                outline: Color::new(accent),
+                text: Color::new(accent),
                 hover: Color::new(0x30000000),
                 pressed: Color::new(0x60000000),
             },
+            tool_button: ButtonColors {
+                outline: Color::new(0x00000000),
+                text: Color::new(0xffeeeeee),
+                hover: Color::new(0x30000000),
+                pressed: Color::new(0x60000000),
+            },
+            slider: Color::new(accent),
+            expand: ExpandColors {
+                icon: Color::new(accent),
+                text: Color::new(0xffeeeeee),
+                hover: Color::new(accent),
+                pressed: Color::new(0x60000000),
+            },
             text_field: TextFieldColors {
-                outline: Color::new(0xff808080),
-                outline_focus: Color::new(0xff303030),
-                fill: Color::new(0xffffffff),
-                text: Color::new(0xff000000),
-                text_hint: Color::new(0x7f000000),
-                label: Color::new(0xff000000),
+                outline: Color::new(0xffeeeeee),
+                outline_focus: Color::new(0xffd4d4d4),
+                fill: Color::new(0xff171717),
+                text: Color::new(0xffeeeeee),
+                text_hint: Color::new(0xffbababa),
+                label: Color::new(0xffeeeeee),
             },
         }
     }

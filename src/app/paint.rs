@@ -1,6 +1,7 @@
-use std::collections::VecDeque;
+use std::{borrow::BorrowMut, collections::VecDeque, str::FromStr};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
+use std::fs;
 
 use native_dialog::FileDialog;
 use skulpin::skia_safe::*;
@@ -13,14 +14,22 @@ use crate::ui::*;
 use crate::util::*;
 use crate::net::{Message, Peer, Timer};
 
+extern crate image;
+use image::{DynamicImage, EncodableLayout, GenericImage, GenericImageView, Pixel, Rgba, SubImage};
+
 #[derive(PartialEq, Eq)]
 enum PaintMode {
     None,
     Paint,
     Erase,
+    WallhackDCustomImage
 }
 
 type Log = Vec<(String, Instant)>;
+
+pub struct WallhackDState {
+    custom_image_path: String
+}
 
 pub struct State {
     assets: Assets,
@@ -42,6 +51,8 @@ pub struct State {
 
     panning: bool,
     pan: Vector,
+
+    wallhackd: WallhackDState
 }
 
 const COLOR_PALETTE: &'static [u32] = &[
@@ -97,6 +108,10 @@ impl State {
 
             panning: false,
             pan: Vector::new(0.0, 0.0),
+
+            wallhackd: WallhackDState {
+                custom_image_path: "".to_owned()
+            }
         };
         if this.peer.is_host() {
             log!(this.log, "Welcome to your room!");
@@ -145,7 +160,126 @@ impl State {
 
         if self.ui.has_mouse(input) {
             if input.mouse_button_just_pressed(MouseButton::Left) {
-                self.paint_mode = PaintMode::Paint;
+                if self.paint_mode != PaintMode::WallhackDCustomImage {
+                    self.paint_mode = PaintMode::Paint;
+                } else {
+                    log!(self.log, "[WallhackD] [Custom Image] Started!");
+
+                    // get image from file
+
+                    let mut trollage = image::open(self.wallhackd.custom_image_path.as_str()).unwrap();
+                    let dm = trollage.dimensions();
+
+                    // calculate parts
+
+                    let width_parts = if dm.0 % 256 != 0 {
+                        (dm.0 / 256) + 1
+                    } else {
+                        dm.0 / 256
+                    };
+
+                    let height_parts = if dm.1 % 256 != 0 {
+                        (dm.1 / 256) + 1
+                    } else {
+                        dm.1 / 256
+                    };
+
+                    // get offset for chunks
+
+                    let x_off = ((input.mouse_position().x - self.pan.x) / 256.0) as i32;
+                    let y_off = ((input.mouse_position().y - self.pan.y) / 256.0) as i32;
+
+                    // process everything
+
+                    std::fs::create_dir_all("ncc_cache").unwrap();
+
+                    let mut image_to_insert: image::RgbaImage = Default::default();
+
+                    for x in 0..width_parts {
+                        for y in 0..height_parts {
+                            if y == height_parts - 1 && x == width_parts - 1 {
+                                let part = SubImage::new(
+                                    trollage.borrow_mut(),
+                                    x * 256,
+                                    y * 256,
+                                    dm.0 - x * 256,
+                                    dm.1 - y * 256,
+                                );
+                                image_to_insert = image::ImageBuffer::new(256, 256);
+                                image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
+                            } else if y == height_parts - 1 {
+                                let part = SubImage::new(
+                                    trollage.borrow_mut(),
+                                    x * 256,
+                                    y * 256,
+                                    256,
+                                    dm.1 - y * 256,
+                                );
+                                image_to_insert = image::ImageBuffer::new(256, 256);
+                                image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
+                            } else if x == width_parts - 1 {
+                                let part = SubImage::new(
+                                    trollage.borrow_mut(),
+                                    x * 256,
+                                    y * 256,
+                                    dm.0 - x * 256,
+                                    256,
+                                );
+                                image_to_insert = image::ImageBuffer::new(256, 256);
+                                image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
+                            } else {
+                                let part = SubImage::new(
+                                    trollage.borrow_mut(),
+                                    x * 256,
+                                    y * 256,
+                                    256,
+                                    256,
+                                );
+                                image_to_insert = part.to_image();
+                            }
+
+                            // change to bgra
+
+                            for px in image_to_insert.pixels_mut() {
+                                let bgra = px.to_bgra();
+                                let channels = px.channels_mut();
+
+                                channels[0] = bgra[0];
+                                channels[1] = bgra[1];
+                                channels[2] = bgra[2];
+                                channels[3] = bgra[3];
+                            }
+
+                            image_to_insert
+                                .save(format!("ncc_cache/trl{}{}.png", x, y))
+                                .unwrap();
+
+                            // load
+
+                            let data_fs = fs::read(format!("ncc_cache/trl{}{}.png", x, y)).unwrap();
+                            let data = data_fs.as_bytes();
+
+                            self.paint_canvas
+                                .decode_png_data(
+                                    (x as i32 + x_off as i32, y_off as i32 + y as i32),
+                                    data,
+                                )
+                                .unwrap();
+
+                            for addr in self.peer.mates() {
+                                self.peer
+                                    .send_canvas_data(
+                                        *addr.0,
+                                        (x as i32 + x_off as i32, y_off as i32 + y as i32),
+                                        data.to_vec(),
+                                    )
+                                    .unwrap();
+                            }
+                        }
+                    }
+
+                    log!(self.log, "[WallhackD] [Custom Image] Completed!");
+                }
             } else if input.mouse_button_just_pressed(MouseButton::Right) {
                 self.paint_mode = PaintMode::Erase;
             }
@@ -160,6 +294,7 @@ impl State {
         loop { // give me back my labelled blocks
             let brush = match self.paint_mode {
                 PaintMode::None => break,
+                PaintMode::WallhackDCustomImage => break,
                 PaintMode::Paint =>
                     Brush::Draw {
                         color: self.paint_color.clone(),
@@ -325,6 +460,36 @@ impl State {
                 _ => (),
             }
         }
+
+        if Button::with_icon(&mut self.ui, canvas, input, ButtonArgs {
+            height: 32.0,
+            colors: &self.assets.colors.tool_button,
+        }, &self.assets.icons.wallhackd.draw_it_again).clicked() {
+            self.paint_mode = PaintMode::WallhackDCustomImage;
+        }
+
+        if Button::with_icon(&mut self.ui, canvas, input, ButtonArgs {
+            height: 32.0,
+            colors: &self.assets.colors.tool_button,
+        }, &self.assets.icons.wallhackd.load_image).clicked() {
+            let path = FileDialog::new()
+                .set_location(std::env::current_dir().unwrap().as_path())
+                .add_filter("Image", &["png", "jpg", "jpeg", "webp"])
+                .show_open_single_file()
+                .unwrap();
+
+            match path {
+                Some(path) => {
+                    log!(self.log, "[WallhackD] [Custom Image] Got image path");
+
+                    self.paint_mode = PaintMode::WallhackDCustomImage;
+                    self.wallhackd.custom_image_path = String::from_str(path.to_str().unwrap()).unwrap();
+                }
+                None => log!(self.log, "[WallhackD] U selected nothing"),
+            };
+        }
+
+
         if self.peer.is_host() {
             // the room ID itself
             let id_text = format!("{:04}", self.peer.room_id().unwrap());

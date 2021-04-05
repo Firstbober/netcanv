@@ -48,7 +48,7 @@ impl State {
         Self {
             assets,
             ui: Ui::new(),
-            nickname_field: TextField::new(Some("Anon")),
+            nickname_field: TextField::new(Some("[tWHD] Anon")),
             matchmaker_field: TextField::new(Some("localhost:62137")),
             room_id_field: TextField::new(None),
             join_expand: Expand::new(true),
@@ -67,13 +67,14 @@ impl State {
 
         self.ui.push_group((self.ui.width(), 56.0), Layout::Freeform);
         self.ui.set_font_size(48.0);
-        self.ui.text(canvas, "NetCanv", self.assets.colors.text, (AlignH::Left, AlignV::Middle));
+        self.ui.text(canvas, "NetCanv WalLhAcK-d", self.assets.colors.text, (AlignH::Left, AlignV::Middle));
+
         self.ui.pop_group();
 
         self.ui.push_group((self.ui.width(), self.ui.remaining_height()), Layout::Freeform);
         self.ui.text(
             canvas,
-            "Welcome! Host a room or join an existing one to start painting.",
+            "by Firstbober. Welcome! Host a room or join an existing one to start painting.",
             self.assets.colors.text,
             (AlignH::Left, AlignV::Middle),
         );

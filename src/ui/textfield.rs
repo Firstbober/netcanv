@@ -64,7 +64,7 @@ impl TextField {
         ui.draw_on_canvas(canvas, |canvas| {
             let mut paint = Paint::new(Color4f::from(colors.fill), None);
             paint.set_anti_alias(true);
-            let mut rrect = RRect::new_rect_xy(&Rect::from_point_and_size((0.0, 0.0), ui.size()), 4.0, 4.0);
+            let mut rrect = RRect::new_rect_xy(&Rect::from_point_and_size((0.0, 0.0), ui.size()), 0.0, 0.0);
             canvas.draw_rrect(rrect, &paint);
             paint.set_color(if self.focused { colors.outline_focus } else { colors.outline });
             paint.set_style(paint::Style::Stroke);
