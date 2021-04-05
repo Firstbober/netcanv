@@ -23,6 +23,11 @@ impl<T: Error + Display> From<T> for Status {
     }
 }
 
+pub struct WallhackDState {
+    host_custom_room_id_expand: Expand,
+    room_id_field: TextField
+}
+
 pub struct State {
     assets: Assets,
     ui: Ui,
@@ -40,6 +45,10 @@ pub struct State {
     status: Status,
     peer: Option<Peer>,
     connected: bool, // when this is true, the state is transitioned to paint::State
+
+    // wallhackd
+
+    wallhackd: WallhackDState
 }
 
 impl State {
@@ -59,6 +68,11 @@ impl State {
             },
             peer: None,
             connected: false,
+
+            wallhackd: WallhackDState {
+                host_custom_room_id_expand: Expand::new(false),
+                room_id_field: TextField::new(None)
+            }
         }
     }
 
@@ -134,7 +148,7 @@ impl State {
             self.ui.space(16.0);
             self.ui.push_group((0.0, TextField::labelled_height(&self.ui)), Layout::Horizontal);
             self.room_id_field.with_label(&mut self.ui, canvas, input, "Room ID", TextFieldArgs {
-                hint: Some("4–6 digits"),
+                hint: Some("1-9 digits"),
                 .. textfield
             });
             self.ui.offset((16.0, 16.0));
@@ -164,6 +178,7 @@ impl State {
             .. expand
         })
             .mutually_exclude(&mut self.join_expand)
+            .mutually_exclude(&mut self.wallhackd.host_custom_room_id_expand)
             .expanded()
         {
             self.ui.push_group(self.ui.remaining_size(), Layout::Vertical);
@@ -183,6 +198,51 @@ impl State {
                     Err(status) => self.status = status,
                 }
             }
+
+            self.ui.fit();
+            self.ui.pop_group();
+        }
+
+        self.ui.space(16.0);
+
+        // wallhackd host room with custom id
+        if self.wallhackd.host_custom_room_id_expand.process(&mut self.ui, canvas, input, ExpandArgs {
+            label: "[WHD] Host a new room with custom ID",
+            .. expand
+        })
+            .mutually_exclude(&mut self.join_expand)
+            .mutually_exclude(&mut self.host_expand)
+            .expanded()
+        {
+            self.ui.push_group(self.ui.remaining_size(), Layout::Vertical);
+            self.ui.offset((32.0, 8.0));
+
+            self.ui.paragraph(canvas, self.assets.colors.text, AlignH::Left, None, &[
+                "Create a blank canvas, or load one from file.",
+                "WallhackD Matchmaker provides function for rooms with custom ID's,",
+                "please enter one to start."
+            ]);
+            self.ui.space(16.0);
+            self.ui.push_group((0.0, TextField::labelled_height(&self.ui)), Layout::Horizontal);
+            self.wallhackd.room_id_field.with_label(&mut self.ui, canvas, input, "Room ID", TextFieldArgs {
+                hint: Some("1-9 digits"),
+                .. textfield
+            });
+            self.ui.offset((16.0, 16.0));
+            if Button::with_text(&mut self.ui, canvas, input, button, "Host").clicked() {
+                match Self::whd_host_room_with_custom_id(
+                    self.nickname_field.text(),
+                    self.matchmaker_field.text(),
+                    self.wallhackd.room_id_field.text()
+                ) {
+                    Ok(peer) => {
+                        self.peer = Some(peer);
+                        self.status = Status::None;
+                    },
+                    Err(status) => self.status = status,
+                }
+            }
+            self.ui.pop_group();
 
             self.ui.fit();
             self.ui.pop_group();
@@ -243,9 +303,21 @@ impl State {
         Ok(Peer::host(nickname, matchmaker_addr_str)?)
     }
 
+    fn whd_host_room_with_custom_id(nickname: &str, matchmaker_addr_str: &str, room_id_str: &str) -> Result<Peer, Status> {
+        if !matches!(room_id_str.len(), 1..=9) {
+            return Err(Status::Error("Room ID must be a number with 1–9 digits".into()))
+        }
+        Self::validate_nickname(nickname)?;
+
+        let room_id: u32 = room_id_str.parse()
+            .map_err(|_| Status::Error("Room ID must be an integer".into()))?;
+
+        Ok(Peer::whd_host_with_custom_id(nickname, matchmaker_addr_str, room_id)?)
+    }
+
     fn join_room(nickname: &str, matchmaker_addr_str: &str, room_id_str: &str) -> Result<Peer, Status> {
-        if !matches!(room_id_str.len(), 4..=6) {
-            return Err(Status::Error("Room ID must be a number with 4–6 digits".into()))
+        if !matches!(room_id_str.len(), 1..=9) {
+            return Err(Status::Error("Room ID must be a number with 1–9 digits".into()))
         }
         Self::validate_nickname(nickname)?;
         let room_id: u32 = room_id_str.parse()

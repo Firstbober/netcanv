@@ -12,6 +12,11 @@ pub enum Packet {
 
     // request from the host to the matchmaker for a free ID
     Host,
+
+    // [WallhackD] request from the host to the matchmaker
+    // to make match on custom ID
+    WallhackDHostWithCustomRoomId(u32),
+
     // response from the matchmaker to the host containing the ID
     RoomId(u32),
     // request from a client to join a room with the given ID

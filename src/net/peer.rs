@@ -105,6 +105,21 @@ impl Peer {
         })
     }
 
+    pub fn whd_host_with_custom_id(nickname: &str, matchmaker_addr: &str, room_id: u32) -> Result<Self, Error> {
+        let mm = Remote::new(matchmaker_addr)?;
+        mm.send(mm::Packet::WallhackDHostWithCustomRoomId(room_id))?;
+
+        Ok(Self {
+            matchmaker: Some(mm),
+            is_self: true,
+            is_host: true,
+            is_relayed: false,
+            nickname: nickname.into(),
+            room_id: None,
+            mates: HashMap::new(),
+        })
+    }
+
     pub fn join(nickname: &str, matchmaker_addr: &str, room_id: u32) -> Result<Self, Error> {
         let mm = Remote::new(matchmaker_addr)?;
         mm.send(mm::Packet::GetHost(room_id))?;

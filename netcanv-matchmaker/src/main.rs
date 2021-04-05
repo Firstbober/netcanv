@@ -61,6 +61,10 @@ impl Matchmaker {
         None
     }
 
+    fn whd_check_if_id_is_free(&self, room_id: u32) -> bool {
+        return !self.rooms.contains_key(&room_id);
+    }
+
     fn send_packet(stream: &TcpStream, packet: Packet) -> Result<(), Error> {
         match &packet {
             Packet::Relayed(..) => (),
@@ -92,6 +96,29 @@ impl Matchmaker {
             },
             None => Self::send_error(&stream, "Could not find any more free rooms. Try again")?,
         }
+        Ok(())
+    }
+
+    fn whd_host_with_custom_id(mm: Arc<Mutex<Self>>, peer_addr: SocketAddr, stream: Arc<TcpStream>, room_id: u32) -> Result<(), Error> {
+        let mut mm = mm.lock().unwrap();
+
+        if mm.whd_check_if_id_is_free(room_id) {
+            let room = Room {
+                host: stream.clone(),
+                clients: Vec::new(),
+                id: room_id
+            };
+
+            {
+                mm.rooms.insert(room_id, room);
+                mm.host_rooms.insert(peer_addr, room_id);
+            }
+            drop(mm);
+            Self::send_packet(&stream, Packet::RoomId(room_id))?;
+        } else {
+            Self::send_error(&stream, "[WallhackD](MM)<CustomRoomID> Wanted ID is in use")?
+        }
+
         Ok(())
     }
 
@@ -190,6 +217,7 @@ impl Matchmaker {
         }
         match packet {
             Packet::Host => Self::host(mm, peer_addr, stream),
+            Packet::WallhackDHostWithCustomRoomId(room_id) => Self::whd_host_with_custom_id(mm, peer_addr, stream, room_id),
             Packet::GetHost(room_id) => Self::join(mm, &stream, room_id),
             Packet::RequestRelay(host_addr) => Self::add_relay(mm, stream, host_addr),
             Packet::Relay(to, data) => Self::relay(mm, peer_addr, &stream, to, &data),
@@ -259,7 +287,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         port = port_str.parse()?;
     }
 
-    eprintln!("NetCanv Matchmaker: starting on port {}", port);
+    eprintln!("NetCanv Matchmaker [Wallhackd]: starting on port {}", port);
 
     let localhost = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = TcpListener::bind(localhost)?;
