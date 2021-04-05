@@ -1,7 +1,9 @@
 use std::error::Error;
 use std::fmt::Display;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 
+use native_dialog::FileDialog;
 use skulpin::skia_safe::*;
 
 use crate::app::{AppState, StateArgs, paint};
@@ -46,9 +48,11 @@ pub struct State {
     peer: Option<Peer>,
     connected: bool, // when this is true, the state is transitioned to paint::State
 
+    image_file: Option<PathBuf>, // when this is Some, the canvas is loaded from a file
+
     // wallhackd
 
-    wallhackd: WallhackDState
+    wallhackd: WallhackDState,
 }
 
 impl State {
@@ -68,6 +72,8 @@ impl State {
             },
             peer: None,
             connected: false,
+
+            image_file: None,
 
             wallhackd: WallhackDState {
                 host_custom_room_id_expand: Expand::new(false),
@@ -185,19 +191,55 @@ impl State {
             self.ui.offset((32.0, 8.0));
 
             self.ui.paragraph(canvas, self.assets.colors.text, AlignH::Left, None, &[
-                "Create a blank canvas, or load one from file,",
+                "Create a blank canvas, or load an existing one from file,",
                 "and share the Room ID with your friends.",
             ]);
             self.ui.space(16.0);
+
+            macro_rules! host_room {
+                () => {
+                    match Self::host_room(self.nickname_field.text(), self.matchmaker_field.text()) {
+                        Ok(peer) => {
+                            self.peer = Some(peer);
+                            self.status = Status::None;
+                        },
+                        Err(status) => self.status = status,
+                    }
+                };
+            }
+
+            self.ui.push_group((self.ui.remaining_width(), 32.0), Layout::Horizontal);
             if Button::with_text(&mut self.ui, canvas, input, button, "Host").clicked() {
-                match Self::host_room(self.nickname_field.text(), self.matchmaker_field.text()) {
-                    Ok(peer) => {
-                        self.peer = Some(peer);
-                        self.status = Status::None;
+                host_room!();
+            }
+            self.ui.space(8.0);
+            if Button::with_text(&mut self.ui, canvas, input, button, "from File").clicked() {
+                match FileDialog::new()
+                    .set_filename("canvas.png")
+                    .add_filter(
+                        "Supported image files",
+                        &[
+                            "png",
+                            "jpg", "jpeg", "jfif",
+                            "gif",
+                            "bmp",
+                            "tif", "tiff",
+                            "webp",
+                            "avif",
+                            "pnm",
+                            "tga",
+                        ])
+                    .show_open_single_file()
+                {
+                    Ok(Some(path)) => {
+                        self.image_file = Some(path);
+                        host_room!();
                     },
-                    Err(status) => self.status = status,
+                    Err(error) => self.status = Status::from(error),
+                    _ => (),
                 }
             }
+            self.ui.pop_group();
 
             self.ui.fit();
             self.ui.pop_group();
@@ -229,17 +271,52 @@ impl State {
                 .. textfield
             });
             self.ui.offset((16.0, 16.0));
+
+            macro_rules! host_room {
+                () => {
+                    match Self::whd_host_room_with_custom_id(
+                        self.nickname_field.text(),
+                        self.matchmaker_field.text(),
+                        self.wallhackd.room_id_field.text()
+                    ) {
+                        Ok(peer) => {
+                            self.peer = Some(peer);
+                            self.status = Status::None;
+                        },
+                        Err(status) => self.status = status,
+                    }
+                };
+            }
+
             if Button::with_text(&mut self.ui, canvas, input, button, "Host").clicked() {
-                match Self::whd_host_room_with_custom_id(
-                    self.nickname_field.text(),
-                    self.matchmaker_field.text(),
-                    self.wallhackd.room_id_field.text()
-                ) {
-                    Ok(peer) => {
-                        self.peer = Some(peer);
-                        self.status = Status::None;
+                host_room!();
+            }
+
+            self.ui.space(8.0);
+            if Button::with_text(&mut self.ui, canvas, input, button, "from File").clicked() {
+                match FileDialog::new()
+                    .set_filename("canvas.png")
+                    .add_filter(
+                        "Supported image files",
+                        &[
+                            "png",
+                            "jpg", "jpeg", "jfif",
+                            "gif",
+                            "bmp",
+                            "tif", "tiff",
+                            "webp",
+                            "avif",
+                            "pnm",
+                            "tga",
+                        ])
+                    .show_open_single_file()
+                {
+                    Ok(Some(path)) => {
+                        self.image_file = Some(path);
+                        host_room!();
                     },
-                    Err(status) => self.status = status,
+                    Err(error) => self.status = Status::from(error),
+                    _ => (),
                 }
             }
             self.ui.pop_group();
@@ -372,7 +449,7 @@ impl AppState for State {
 
     fn next_state(self: Box<Self>) -> Box<dyn AppState> {
         if self.connected {
-            Box::new(paint::State::new(self.assets, self.peer.unwrap()))
+            Box::new(paint::State::new(self.assets, self.peer.unwrap(), self.image_file))
         } else {
             self
         }
