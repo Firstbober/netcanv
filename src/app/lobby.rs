@@ -63,7 +63,7 @@ impl State {
         Self {
             assets,
             ui: Ui::new(),
-            nickname_field: TextField::new(Some("[tWHD] Anon")),
+            nickname_field: TextField::new(Some("Anon")),
             matchmaker_field: TextField::new(Some(option_env!("WHD_NC_SERVER").unwrap_or("localhost:62137"))),
             room_id_field: TextField::new(None),
             join_expand: Expand::new(true),
@@ -340,7 +340,7 @@ impl State {
 
     fn process_status(&mut self, canvas: &mut Canvas) {
         if !matches!(self.status, Status::None) {
-            self.ui.push_group((self.ui.width(), 24.0), Layout::Horizontal);
+            self.ui.push_group((self.ui.width(), 84.0), Layout::Horizontal);
             let icon =
                 match self.status {
                     Status::None => unreachable!(),
@@ -365,9 +365,12 @@ impl State {
 
             self.ui.pop_group();
             self.ui.pop_group();
+
+            self.ui.push_group((self.ui.width(), 36.0), Layout::Vertical);
+        } else {
+            self.ui.push_group((self.ui.width(), 120.0), Layout::Vertical);
         }
 
-        self.ui.push_group((self.ui.width(), 120.0), Layout::Vertical);
         self.ui.text(canvas, format!("Netcanv {}", env!("CARGO_PKG_VERSION")).as_str(), self.assets.colors.text_field.text_hint, (AlignH::Left, AlignV::Bottom));
         self.ui.pop_group();
 
