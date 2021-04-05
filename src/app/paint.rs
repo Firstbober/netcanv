@@ -15,6 +15,8 @@ use crate::ui::*;
 use crate::util::*;
 use crate::net::{Message, Peer, Timer};
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 extern crate image;
 use image::{DynamicImage, EncodableLayout, GenericImage, GenericImageView, Pixel, Rgba, SubImage};
 
@@ -29,7 +31,10 @@ enum PaintMode {
 type Log = Vec<(String, Instant)>;
 
 pub struct WallhackDState {
-    custom_image_path: String
+    custom_image_path: String,
+    printed_room_id: bool,
+
+    previous_chunk_data_timestamp: Option<SystemTime>
 }
 
 pub struct State {
@@ -111,7 +116,9 @@ impl State {
             pan: Vector::new(0.0, 0.0),
 
             wallhackd: WallhackDState {
-                custom_image_path: "".to_owned()
+                custom_image_path: "".to_owned(),
+                printed_room_id: false,
+                previous_chunk_data_timestamp: None
             }
         };
         if this.peer.is_host() {
@@ -154,6 +161,30 @@ impl State {
     }
 
     fn process_canvas(&mut self, canvas: &mut Canvas, input: &Input) {
+        if self.assets.wallhackd_commandline.headless_client {
+            let sc = self.assets.wallhackd_commandline.save_canvas.clone();
+
+            if sc.is_some() && self.wallhackd.previous_chunk_data_timestamp.is_some() {
+                match self.wallhackd.previous_chunk_data_timestamp.unwrap().elapsed() {
+                    Ok(time) => {
+                        if time.as_secs() > 120 {
+                            match self.paint_canvas.save(&PathBuf::from(sc.unwrap())) {
+                                Ok(_) => {
+                                    println!("Saved canvas to file!");
+                                    std::process::exit(0);
+                                },
+                                Err(err) => {
+                                    println!("Failed to save canvas! Reason: {}", err);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                    },
+                    Err(_err) => std::process::exit(1)
+                }
+            }
+        }
+
         self.ui.push_group((self.ui.width(), self.ui.height() - Self::BAR_SIZE), Layout::Freeform);
 
         //
@@ -499,6 +530,11 @@ impl State {
 
 
         if self.peer.is_host() {
+            if !self.wallhackd.printed_room_id {
+                println!("Created room with id {:04}!", self.peer.room_id().unwrap());
+                self.wallhackd.printed_room_id = true;
+            }
+
             // the room ID itself
             let id_text = format!("{:04}", self.peer.room_id().unwrap());
             self.ui.push_group((64.0, self.ui.height()), Layout::Freeform);
@@ -541,8 +577,13 @@ impl AppState for State {
                     Message::Stroke(points) => Self::fellow_stroke(&mut self.paint_canvas, &points),
 
                     Message::NewMate(addr) => self.canvas_data_queue.push_back(addr),
-                    Message::CanvasData(chunk, png) =>
-                        Self::canvas_data(&mut self.log, &mut self.paint_canvas, chunk, &png),
+                    Message::CanvasData(chunk, png) => {
+                        if self.assets.wallhackd_commandline.save_canvas.is_some() {
+                            self.wallhackd.previous_chunk_data_timestamp = Some(SystemTime::now());
+                        }
+
+                        Self::canvas_data(&mut self.log, &mut self.paint_canvas, chunk, &png)
+                    },
 
                     Message::Joined(nickname) => log!(self.log, "{} joined the room", nickname),
                     Message::Left(nickname) => log!(self.log, "{} has left the room", nickname),

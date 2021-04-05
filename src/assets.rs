@@ -1,4 +1,8 @@
+use std::borrow::Borrow;
+
 use skulpin::skia_safe::*;
+
+use crate::{wallhackd};
 
 use crate::ui::{ButtonColors, ExpandColors, ExpandIcons, TextFieldColors};
 use crate::util::{RcFont, new_rc_font};
@@ -56,6 +60,8 @@ pub struct Assets {
 
     pub colors: ColorScheme,
     pub icons: Icons,
+
+    pub wallhackd_commandline: wallhackd::WallhackDCommandline
 }
 
 impl Assets {
@@ -104,7 +110,23 @@ impl Assets {
                     draw_it_again: Self::load_icon(REPLAY)
                 }
             },
+
+            wallhackd_commandline: wallhackd::WallhackDCommandline {
+                headless_client: false,
+                headless_host: false,
+
+                username: None,
+                matchmaker_addr: None,
+                roomid: None,
+
+                save_canvas: None,
+                load_canvas: None,
+            }
         }
+    }
+
+    pub fn whd_add_commandline(&mut self, cmd: wallhackd::WallhackDCommandline) {
+        self.wallhackd_commandline = cmd;
     }
 
 }
@@ -119,7 +141,7 @@ impl ColorScheme {
             panel: Color::new(0xc5141414),
             panel2: Color::new(0xffffffff),
             separator: Color::new(0xffFF5722),
-            error: Color::new(0xff7f0000),
+            error: Color::new(0xffF44336),
 
             button: ButtonColors {
                 outline: Color::new(accent),

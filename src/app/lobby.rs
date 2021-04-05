@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{borrow::Borrow, error::Error};
 use std::fmt::Display;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -6,13 +6,12 @@ use std::path::PathBuf;
 use native_dialog::FileDialog;
 use skulpin::skia_safe::*;
 
-use crate::app::{AppState, StateArgs, paint};
+use crate::{app::{AppState, StateArgs, paint}, wallhackd};
 use crate::assets::Assets;
 use crate::ui::*;
 use crate::util::get_window_size;
 use crate::net::{Message, Peer};
 
-const WALLHACKD_VERSION: &str = "1.0.2";
 
 #[derive(Debug)]
 enum Status {
@@ -29,7 +28,10 @@ impl<T: Error + Display> From<T> for Status {
 
 pub struct WallhackDState {
     host_custom_room_id_expand: Expand,
-    room_id_field: TextField
+    room_id_field: TextField,
+
+    headless_trying_to_host: bool,
+    headless_trying_to_join: bool
 }
 
 pub struct State {
@@ -60,12 +62,16 @@ pub struct State {
 impl State {
 
     pub fn new(assets: Assets, error: Option<&str>) -> Self {
+        let username = assets.wallhackd_commandline.username.clone().unwrap_or("Anon".to_owned());
+        let mm_addr = assets.wallhackd_commandline.matchmaker_addr.clone().unwrap_or("localhost:62137".to_owned());
+        let roomid = assets.wallhackd_commandline.roomid.clone().unwrap_or("".to_owned());
+
         Self {
             assets,
             ui: Ui::new(),
-            nickname_field: TextField::new(Some("Anon")),
-            matchmaker_field: TextField::new(Some(option_env!("WHD_NC_SERVER").unwrap_or("localhost:62137"))),
-            room_id_field: TextField::new(None),
+            nickname_field: TextField::new(Some(username.as_str())),
+            matchmaker_field: TextField::new(Some(mm_addr.as_str())),
+            room_id_field: TextField::new(Some(roomid.as_str())),
             join_expand: Expand::new(true),
             host_expand: Expand::new(false),
             status: match error {
@@ -79,7 +85,10 @@ impl State {
 
             wallhackd: WallhackDState {
                 host_custom_room_id_expand: Expand::new(false),
-                room_id_field: TextField::new(None)
+                room_id_field: TextField::new(Some(roomid.as_str())),
+
+                headless_trying_to_host: false,
+                headless_trying_to_join: false
             }
         }
     }
@@ -106,6 +115,90 @@ impl State {
     }
 
     fn process_menu(&mut self, canvas: &mut Canvas, input: &mut Input) -> Option<Box<dyn AppState>> {
+        if self.assets.wallhackd_commandline.headless_host {
+            if !self.wallhackd.headless_trying_to_host {
+                self.wallhackd.headless_trying_to_host = true;
+
+                let whd_cmd = self.assets.wallhackd_commandline.borrow();
+
+                let lc = whd_cmd.load_canvas.clone();
+
+                match lc {
+                    Some(st) => self.image_file = Some(PathBuf::from(st)),
+                    None => ()
+                }
+
+                if self.assets.wallhackd_commandline.roomid.is_some() {
+                    match Self::whd_host_room_with_custom_id(
+                        whd_cmd.username.clone().unwrap_or("HeadlessServer".to_owned()).as_str(),
+                        whd_cmd.matchmaker_addr.clone().unwrap().as_str(),
+                        whd_cmd.roomid.clone().unwrap().as_str()
+                    ) {
+                        Ok(peer) => {
+                            self.peer = Some(peer);
+                            self.status = Status::None;
+                        },
+                        Err(status) => self.status = status,
+                    }
+                } else {
+                    match Self::host_room(
+                        whd_cmd.username.clone().unwrap_or("HeadlessServer".to_owned()).as_str(),
+                        whd_cmd.matchmaker_addr.clone().unwrap().as_str()
+                    ) {
+                        Ok(peer) => {
+                            self.peer = Some(peer);
+                            self.status = Status::None;
+                        },
+                        Err(status) => self.status = status,
+                    }
+                }
+
+                match &self.status {
+                    Status::None => (),
+                    Status::Info(info) => {
+                        println!("[Info] {}", info);
+                    },
+                    Status::Error(error) => {
+                        println!("[Error] {}", error);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
+
+        if self.assets.wallhackd_commandline.headless_client {
+            if !self.wallhackd.headless_trying_to_join {
+                self.wallhackd.headless_trying_to_join = true;
+
+                let whd_cmd = self.assets.wallhackd_commandline.borrow();
+
+                match Self::join_room(
+                    whd_cmd.username.clone().unwrap().as_str(),
+                    whd_cmd.matchmaker_addr.clone().unwrap().as_str(),
+                    whd_cmd.roomid.clone().unwrap().as_str()
+                ) {
+                    Ok(peer) => {
+                        println!("Joined room with id {}!", whd_cmd.roomid.clone().unwrap());
+                        self.peer = Some(peer);
+                        self.status = Status::None;
+                    },
+                    Err(status) => self.status = status,
+                }
+
+                match &self.status {
+                    Status::None => (),
+                    Status::Info(info) => {
+                        println!("[Info] {}", info);
+                    },
+                    Status::Error(error) => {
+                        println!("[Error] {}", error);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
+
+
         self.ui.push_group((self.ui.width(), self.ui.remaining_height()), Layout::Vertical);
 
         let button = ButtonArgs {
@@ -144,6 +237,7 @@ impl State {
             .. expand
         })
             .mutually_exclude(&mut self.host_expand)
+            .mutually_exclude(&mut self.wallhackd.host_custom_room_id_expand)
             .expanded()
         {
             self.ui.push_group(self.ui.remaining_size(), Layout::Vertical);
@@ -375,7 +469,7 @@ impl State {
         self.ui.pop_group();
 
         self.ui.push_group((self.ui.width(), 20.0), Layout::Vertical);
-        self.ui.text(canvas, format!("WallhackD {}", WALLHACKD_VERSION).as_str(), self.assets.colors.text_field.text_hint, (AlignH::Left, AlignV::Bottom));
+        self.ui.text(canvas, format!("WallhackD {}", wallhackd::WALLHACKD_VERSION).as_str(), self.assets.colors.text_field.text_hint, (AlignH::Left, AlignV::Bottom));
         self.ui.pop_group();
 
     }

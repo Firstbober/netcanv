@@ -4,7 +4,10 @@
 - Dark theme
 - Pasting images
 - Custom Room ID with Wallhackd Matchmaker
-- WHD_NC_SERVER env var for changing server without entering text
+- Command line options
+- Headless client and server
+- Save canvas without UI
+- Filling out username, roomid and matchmaker address using cli
 
 # NetCanv
 
