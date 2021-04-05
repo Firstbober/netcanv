@@ -184,10 +184,14 @@ impl State {
                         dm.1 / 256
                     };
 
+                    log!(self.log, "[WallhackD] [Custom Image] {} parts will be needed", width_parts * height_parts);
+
                     // get offset for chunks
 
                     let x_off = ((input.mouse_position().x - self.pan.x) / 256.0) as i32;
                     let y_off = ((input.mouse_position().y - self.pan.y) / 256.0) as i32;
+
+                    log!(self.log, "[WallhackD] [Custom Image] Starting on chunks {}, {}", x_off, y_off);
 
                     // process everything
 
