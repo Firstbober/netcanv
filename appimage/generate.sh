@@ -22,7 +22,7 @@ rm -rf *;
 rm -rf AppDir_app;
 rm -rf AppDir_mm;
 
-mv netcanv-* netcanv-wallhackd-client-x86_64.AppImage;
-mv netcanv_matchmaker-* netcanv-wallhackd-matchmaker-x86_64.AppImage;
+mv NetCanv-* netcanv-wallhackd-client-x86_64.AppImage;
+mv NetCanv_Matchmaker-* netcanv-wallhackd-matchmaker-x86_64.AppImage;
 
 cd ..;
