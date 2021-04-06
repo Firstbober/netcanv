@@ -512,13 +512,16 @@ impl State {
     }
 
     fn whd_process_right_bar(&mut self, canvas: &mut Canvas, input: &mut Input) {
-        if Button::with_icon(&mut self.ui, canvas, input, ButtonArgs {
+        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
             height: 32.0,
             colors: &self.assets.colors.tool_button,
         }, match self.assets.colors.scheme_type {
             crate::assets::ColorSchemeType::Dark => &self.assets.icons.wallhackd.light_mode,
             crate::assets::ColorSchemeType::Light => &self.assets.icons.wallhackd.dark_mode,
-        }).clicked() {
+        }, match self.assets.colors.scheme_type {
+            crate::assets::ColorSchemeType::Dark => "Change to light mode".to_owned(),
+            crate::assets::ColorSchemeType::Light => "Change to dark mode".to_owned(),
+        }, WHDTooltipPos::Left).clicked() {
             match self.assets.colors.scheme_type {
                 ColorSchemeType::Dark => self.assets.colors = ColorScheme::light(),
                 ColorSchemeType::Light => self.assets.colors = ColorScheme::whd_dark()

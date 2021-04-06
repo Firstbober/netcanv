@@ -485,10 +485,14 @@ impl State {
         self.ui.push_group((self.ui.remaining_width(), self.ui.height()), Layout::HorizontalRev);
         // note that the elements go from right to left
         // the save button
-        if Button::with_icon(&mut self.ui, canvas, input, ButtonArgs {
-            height: 32.0,
-            colors: &self.assets.colors.tool_button,
-        }, &self.assets.icons.file.save).clicked() {
+        if Button::with_icon_and_tooltip(
+            &mut self.ui, canvas, input, ButtonArgs {
+                height: 32.0,
+                colors: &self.assets.colors.tool_button,
+            }, &self.assets.icons.file.save,
+            "Save canvas".to_owned(),
+            WHDTooltipPos::TopLeft
+        ).clicked() {
             match FileDialog::new()
                 .set_filename("canvas.png")
                 .add_filter("PNG image", &["png"])
@@ -503,17 +507,21 @@ impl State {
             }
         }
 
-        if Button::with_icon(&mut self.ui, canvas, input, ButtonArgs {
+        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
             height: 32.0,
             colors: &self.assets.colors.tool_button,
-        }, &self.assets.icons.wallhackd.draw_it_again).clicked() {
+        }, &self.assets.icons.wallhackd.draw_it_again,
+        "Draw again".to_owned(),
+        WHDTooltipPos::Top).clicked() {
             self.paint_mode = PaintMode::WallhackDCustomImage;
         }
 
-        if Button::with_icon(&mut self.ui, canvas, input, ButtonArgs {
+        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
             height: 32.0,
             colors: &self.assets.colors.tool_button,
-        }, &self.assets.icons.wallhackd.load_image).clicked() {
+        }, &self.assets.icons.wallhackd.load_image,
+        "Draw image".to_owned(),
+        WHDTooltipPos::Top).clicked() {
             let path = FileDialog::new()
                 .set_location(std::env::current_dir().unwrap().as_path())
                 .add_filter("Image", &["png", "jpg", "jpeg", "webp"])

@@ -148,6 +148,9 @@ impl Assets {
 
 impl ColorScheme {
     pub fn light() -> Self {
+        let tooltip_bg = Color::new(0xff000000);
+        let tooltip_text = Color::new(0xffeeeeee);
+
         Self {
             text: Color::new(0xff000000),
             panel: Color::new(0xffeeeeee),
@@ -160,12 +163,18 @@ impl ColorScheme {
                 text: Color::new(0xff000000),
                 hover: Color::new(0x20000000),
                 pressed: Color::new(0x50000000),
+
+                whd_tooltip_bg: tooltip_bg,
+                whd_tooltip_text: tooltip_text
             },
             tool_button: ButtonColors {
                 outline: Color::new(0x00000000),
                 text: Color::new(0xff000000),
                 hover: Color::new(0x20000000),
                 pressed: Color::new(0x50000000),
+
+                whd_tooltip_bg: tooltip_bg,
+                whd_tooltip_text: tooltip_text
             },
             slider: Color::new(0xff000000),
             expand: ExpandColors {
@@ -190,6 +199,9 @@ impl ColorScheme {
     pub fn whd_dark() -> Self {
         let accent = 0xffFF9800;
 
+        let tooltip_bg = Color::new(0xffeeeeee);
+        let tooltip_text = Color::new(0xc5141414);
+
         Self {
             text: Color::new(0xffeeeeee),
             panel: Color::new(0xc5141414),
@@ -202,12 +214,18 @@ impl ColorScheme {
                 text: Color::new(accent),
                 hover: Color::new(0x30ffffff),
                 pressed: Color::new(0x60000000),
+
+                whd_tooltip_bg: tooltip_bg,
+                whd_tooltip_text: tooltip_text
             },
             tool_button: ButtonColors {
                 outline: Color::new(0x00000000),
                 text: Color::new(0xffeeeeee),
                 hover: Color::new(0x30ffffff),
                 pressed: Color::new(0x60000000),
+
+                whd_tooltip_bg: tooltip_bg,
+                whd_tooltip_text: tooltip_text
             },
             slider: Color::new(accent),
             expand: ExpandColors {
