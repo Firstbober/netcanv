@@ -18,6 +18,13 @@ const SAVE_SVG: &[u8] = include_bytes!("assets/icons/save.svg");
 
 const ADD_PHOTO_ALTERNATE: &[u8] = include_bytes!("assets/icons/add-photo-alternate.svg");
 const REPLAY: &[u8] = include_bytes!("assets/icons/replay.svg");
+const DARK_MODE: &[u8] = include_bytes!("assets/icons/dark-mode.svg");
+const LIGHT_MODE: &[u8] = include_bytes!("assets/icons/light-mode.svg");
+
+pub enum ColorSchemeType {
+    Light,
+    Dark
+}
 
 pub struct ColorScheme {
     pub text: Color,
@@ -31,6 +38,8 @@ pub struct ColorScheme {
     pub expand: ExpandColors,
     pub slider: Color,
     pub text_field: TextFieldColors,
+
+    pub scheme_type: ColorSchemeType
 }
 
 pub struct StatusIcons {
@@ -44,7 +53,10 @@ pub struct FileIcons {
 
 pub struct WallhackdIcons {
     pub load_image: Image,
-    pub draw_it_again: Image
+    pub draw_it_again: Image,
+
+    pub dark_mode: Image,
+    pub light_mode: Image,
 }
 
 pub struct Icons {
@@ -107,7 +119,10 @@ impl Assets {
                 },
                 wallhackd: WallhackdIcons {
                     load_image: Self::load_icon(ADD_PHOTO_ALTERNATE),
-                    draw_it_again: Self::load_icon(REPLAY)
+                    draw_it_again: Self::load_icon(REPLAY),
+
+                    dark_mode: Self::load_icon(DARK_MODE),
+                    light_mode: Self::load_icon(LIGHT_MODE)
                 }
             },
 
@@ -132,8 +147,47 @@ impl Assets {
 }
 
 impl ColorScheme {
-
     pub fn light() -> Self {
+        Self {
+            text: Color::new(0xff000000),
+            panel: Color::new(0xffeeeeee),
+            panel2: Color::new(0xffffffff),
+            separator: Color::new(0xff202020),
+            error: Color::new(0xff7f0000),
+
+            button: ButtonColors {
+                outline: Color::new(0x40000000),
+                text: Color::new(0xff000000),
+                hover: Color::new(0x20000000),
+                pressed: Color::new(0x50000000),
+            },
+            tool_button: ButtonColors {
+                outline: Color::new(0x00000000),
+                text: Color::new(0xff000000),
+                hover: Color::new(0x20000000),
+                pressed: Color::new(0x50000000),
+            },
+            slider: Color::new(0xff000000),
+            expand: ExpandColors {
+                icon: Color::new(0xff000000),
+                text: Color::new(0xff000000),
+                hover: Color::new(0x30000000),
+                pressed: Color::new(0x60000000),
+            },
+            text_field: TextFieldColors {
+                outline: Color::new(0xff808080),
+                outline_focus: Color::new(0xff303030),
+                fill: Color::new(0xffffffff),
+                text: Color::new(0xff000000),
+                text_hint: Color::new(0x7f000000),
+                label: Color::new(0xff000000),
+            },
+
+            scheme_type: ColorSchemeType::Light
+        }
+    }
+
+    pub fn whd_dark() -> Self {
         let accent = 0xffFF9800;
 
         Self {
@@ -146,13 +200,13 @@ impl ColorScheme {
             button: ButtonColors {
                 outline: Color::new(accent),
                 text: Color::new(accent),
-                hover: Color::new(0x30000000),
+                hover: Color::new(0x30ffffff),
                 pressed: Color::new(0x60000000),
             },
             tool_button: ButtonColors {
                 outline: Color::new(0x00000000),
                 text: Color::new(0xffeeeeee),
-                hover: Color::new(0x30000000),
+                hover: Color::new(0x30ffffff),
                 pressed: Color::new(0x60000000),
             },
             slider: Color::new(accent),
@@ -170,6 +224,8 @@ impl ColorScheme {
                 text_hint: Color::new(0xffbababa),
                 label: Color::new(0xffeeeeee),
             },
+
+            scheme_type: ColorSchemeType::Dark
         }
     }
 

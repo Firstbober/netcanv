@@ -152,7 +152,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let winit_window = {
             let mut b = WindowBuilder::new()
                 .with_inner_size(LogicalSize::new(1024, 600))
-                .with_title("NetCanv")
+                .with_title("[WHD] NetCanv")
                 .with_resizable(true);
             #[cfg(target_os = "linux")]
             {
@@ -167,7 +167,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .use_vulkan_debug_layer(false)
             .build(&window)?;
 
-        let mut assets = Assets::new(ColorScheme::light());
+        let mut assets = Assets::new(ColorScheme::whd_dark());
         assets.whd_add_commandline(whd_cmd);
         let mut app: Option<Box<dyn AppState>> =
             Some(Box::new(lobby::State::new(assets, None)) as _);

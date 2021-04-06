@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use native_dialog::FileDialog;
 use skulpin::skia_safe::*;
 
-use crate::{app::{AppState, StateArgs, paint}, wallhackd};
+use crate::{app::{AppState, StateArgs, paint}, assets::{ColorScheme, ColorSchemeType}, wallhackd};
 use crate::assets::Assets;
 use crate::ui::*;
 use crate::util::get_window_size;
@@ -88,7 +88,7 @@ impl State {
                 room_id_field: TextField::new(Some(roomid.as_str())),
 
                 headless_trying_to_host: false,
-                headless_trying_to_join: false
+                headless_trying_to_join: false,
             }
         }
     }
@@ -98,14 +98,14 @@ impl State {
 
         self.ui.push_group((self.ui.width(), 56.0), Layout::Freeform);
         self.ui.set_font_size(48.0);
-        self.ui.text(canvas, "NetCanv WalLhAcK-d", self.assets.colors.text, (AlignH::Left, AlignV::Middle));
+        self.ui.text(canvas, "NetCanv [WHD]", self.assets.colors.text, (AlignH::Left, AlignV::Middle));
 
         self.ui.pop_group();
 
         self.ui.push_group((self.ui.width(), self.ui.remaining_height()), Layout::Freeform);
         self.ui.text(
             canvas,
-            "by Firstbober. Welcome! Host a room or join an existing one to start painting.",
+            "[WHD] by Firstbober. Welcome! Host a room or join an existing one to start painting.",
             self.assets.colors.text,
             (AlignH::Left, AlignV::Middle),
         );
@@ -478,8 +478,8 @@ impl State {
         if nickname.is_empty() {
             return Err(Status::Error("Nickname must not be empty".into()))
         }
-        if nickname.len() > 16 {
-            return Err(Status::Error("The maximum length of a nickname is 16 characters".into()))
+        if nickname.len() > 24 {
+            return Err(Status::Error("The maximum length of a nickname is 24 characters".into()))
         }
         Ok(())
     }
@@ -511,6 +511,20 @@ impl State {
         Ok(Peer::join(nickname, matchmaker_addr_str, room_id)?)
     }
 
+    fn whd_process_right_bar(&mut self, canvas: &mut Canvas, input: &mut Input) {
+        if Button::with_icon(&mut self.ui, canvas, input, ButtonArgs {
+            height: 32.0,
+            colors: &self.assets.colors.tool_button,
+        }, match self.assets.colors.scheme_type {
+            crate::assets::ColorSchemeType::Dark => &self.assets.icons.wallhackd.light_mode,
+            crate::assets::ColorSchemeType::Light => &self.assets.icons.wallhackd.dark_mode,
+        }).clicked() {
+            match self.assets.colors.scheme_type {
+                ColorSchemeType::Dark => self.assets.colors = ColorScheme::light(),
+                ColorSchemeType::Light => self.assets.colors = ColorScheme::whd_dark()
+            };
+        }
+    }
 }
 
 impl AppState for State {
@@ -540,19 +554,26 @@ impl AppState for State {
             }
         }
 
-        self.ui.begin(get_window_size(&coordinate_system_helper), Layout::Freeform);
+        self.ui.begin(get_window_size(&coordinate_system_helper), Layout::Horizontal);
         self.ui.set_font(self.assets.sans.clone());
         self.ui.set_font_size(14.0);
 
         self.ui.pad((64.0, 64.0));
 
         self.ui.push_group((self.ui.width(), 384.0), Layout::Vertical);
-        //self.ui.align((AlignH::Left, AlignV::Middle));
+        self.ui.align((AlignH::Left, AlignV::Top));
         self.process_header(canvas);
         self.ui.space(24.0);
         self.process_menu(canvas, input);
         self.ui.space(24.0);
         self.process_status(canvas);
+        self.ui.pop_group();
+
+        
+
+        self.ui.push_group((32.0, self.ui.height()), Layout::Vertical);
+        self.ui.align((AlignH::Right, AlignV::Top));
+        self.whd_process_right_bar(canvas, input);
         self.ui.pop_group();
     }
 

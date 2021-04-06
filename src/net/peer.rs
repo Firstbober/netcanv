@@ -99,7 +99,7 @@ impl Peer {
             is_self: true,
             is_host: true,
             is_relayed: false,
-            nickname: nickname.into(),
+            nickname: format!("[tWHD] {}", nickname),
             room_id: None,
             mates: HashMap::new(),
         })
@@ -114,7 +114,7 @@ impl Peer {
             is_self: true,
             is_host: true,
             is_relayed: false,
-            nickname: nickname.into(),
+            nickname: format!("[tWHD] {}", nickname),
             room_id: None,
             mates: HashMap::new(),
         })
@@ -129,7 +129,7 @@ impl Peer {
             is_self: true,
             is_host: false,
             is_relayed: false,
-            nickname: nickname.into(),
+            nickname: format!("[tWHD] {}", nickname),
             room_id: None,
             mates: HashMap::new(),
         })
