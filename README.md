@@ -8,6 +8,7 @@
 - Headless client and server
 - Save canvas without UI
 - Filling out username, roomid and matchmaker address using cli
+- Username length raised to 24 characters
 
 # NetCanv
 
