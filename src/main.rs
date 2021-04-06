@@ -5,9 +5,10 @@ use skulpin::*;
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::WindowBuilder;
+
 #[cfg(target_os = "linux")]
 use winit::platform::unix::WindowBuilderExtUnix;
-use winit::window::WindowBuilder;
 
 mod app;
 mod assets;
@@ -15,6 +16,7 @@ mod net;
 mod paint_canvas;
 mod ui;
 mod util;
+mod viewport;
 
 mod wallhackd;
 
