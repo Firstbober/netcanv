@@ -62,7 +62,7 @@ pub struct Chunk<'a> {
 }
 
 impl<'a> Chunk<'a> {
-    const SIZE: (i32, i32) = (256, 256);
+    pub const SIZE: (i32, i32) = (256, 256);
 
 
     fn new() -> Self {
@@ -92,7 +92,7 @@ impl<'a> Chunk<'a> {
         }
     }
 
-    fn pixels(&self) -> &'a [u8] {
+    pub fn pixels(&self) -> &'a [u8] {
         unsafe {
             // i hope *even more* that _this_ is correct, as sus at it looks everything should be fine.
             // ~ top 10 quotes said before tragedy
@@ -106,13 +106,13 @@ impl<'a> Chunk<'a> {
         ImageBuffer::from_raw(Self::SIZE.0 as u32, Self::SIZE.1 as u32, self.pixels()).unwrap()
     }
 
-    fn as_image_buffer_mut(&mut self) -> ImageBuffer<Rgba<u8>, &'a mut [u8]> {
+    pub fn as_image_buffer_mut(&mut self) -> ImageBuffer<Rgba<u8>, &'a mut [u8]> {
         ImageBuffer::from_raw(Self::SIZE.0 as u32, Self::SIZE.1 as u32, self.pixels_mut()).unwrap()
     }
 
     // reencodes PNG data if necessary.
     // PNG data is reencoded upon outside request, but invalidated if the chunk is modified
-    fn png_data(&mut self) -> Option<&[u8]> {
+    pub fn png_data(&mut self) -> Option<&[u8]> {
         if self.png_data.is_none() {
             let pixels = self.pixels_mut();
             let (width, height) = (self.bitmap.width() as u32, self.bitmap.height() as u32);
@@ -142,7 +142,7 @@ impl<'a> Chunk<'a> {
 }
 
 pub struct PaintCanvas<'a> {
-    chunks: HashMap<(i32, i32), Chunk<'a>>,
+    pub chunks: HashMap<(i32, i32), Chunk<'a>>,
     // this set contains all chunks that have already been visited in the current stroke() call
     stroked_chunks: HashSet<(i32, i32)>,
 }
@@ -160,7 +160,7 @@ impl<'a> PaintCanvas<'a> {
         }
     }
 
-    fn ensure_chunk_exists(&mut self, position: (i32, i32)) {
+    pub fn ensure_chunk_exists(&mut self, position: (i32, i32)) {
         if !self.chunks.contains_key(&position) {
             self.chunks.insert(position, Chunk::new());
         }
@@ -253,7 +253,7 @@ impl<'a> PaintCanvas<'a> {
     // right now loading/saving only really works (well, was tested) on little-endian machines, so i make no guarantees
     // if it works on big-endian. most likely loading will screw up the channel order in pixels. thanks, skia!
 
-    fn fix_endianness<C>(image: &mut ImageBuffer<Rgba<u8>, C>)
+    pub fn fix_endianness<C>(image: &mut ImageBuffer<Rgba<u8>, C>)
         where C: Deref<Target = [u8]> + DerefMut
     {
         #[cfg(target_endian = "little")]

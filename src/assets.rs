@@ -16,10 +16,18 @@ const INFO_SVG: &[u8] = include_bytes!("assets/icons/info.svg");
 const ERROR_SVG: &[u8] = include_bytes!("assets/icons/error.svg");
 const SAVE_SVG: &[u8] = include_bytes!("assets/icons/save.svg");
 
+// [WHD]
+
 const ADD_PHOTO_ALTERNATE: &[u8] = include_bytes!("assets/icons/add-photo-alternate.svg");
 const REPLAY: &[u8] = include_bytes!("assets/icons/replay.svg");
+
 const DARK_MODE: &[u8] = include_bytes!("assets/icons/dark-mode.svg");
 const LIGHT_MODE: &[u8] = include_bytes!("assets/icons/light-mode.svg");
+
+const ARROW_BACK: &[u8] = include_bytes!("assets/icons/arrow-back.svg");
+const ARROW_FORWARD: &[u8] = include_bytes!("assets/icons/arrow-forward.svg");
+
+// [WHD]
 
 pub enum ColorSchemeType {
     Light,
@@ -57,6 +65,9 @@ pub struct WallhackdIcons {
 
     pub dark_mode: Image,
     pub light_mode: Image,
+
+    pub forward: Image,
+    pub backwards: Image
 }
 
 pub struct Icons {
@@ -122,7 +133,10 @@ impl Assets {
                     draw_it_again: Self::load_icon(REPLAY),
 
                     dark_mode: Self::load_icon(DARK_MODE),
-                    light_mode: Self::load_icon(LIGHT_MODE)
+                    light_mode: Self::load_icon(LIGHT_MODE),
+
+                    forward: Self::load_icon(ARROW_FORWARD),
+                    backwards: Self::load_icon(ARROW_BACK)
                 }
             },
 

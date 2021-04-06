@@ -31,11 +31,17 @@ enum PaintMode {
 
 type Log = Vec<(String, Instant)>;
 
+pub enum WallhackDrawingDirection {
+    ToLeft,
+    ToRight
+}
+
 pub struct WallhackDState {
     custom_image_path: String,
+    drawing_direction: WallhackDrawingDirection,
     printed_room_id: bool,
 
-    previous_chunk_data_timestamp: Option<SystemTime>
+    previous_chunk_data_timestamp: Option<SystemTime>,
 }
 
 pub struct State {
@@ -57,7 +63,6 @@ pub struct State {
     log: Log,
 
     panning: bool,
-    pan: Vector,
     viewport: Viewport,
 
     wallhackd: WallhackDState
@@ -115,10 +120,10 @@ impl State {
             log: Log::new(),
 
             panning: false,
-            pan: Vector::new(0.0, 0.0),
             viewport: Viewport::new(),
 
             wallhackd: WallhackDState {
+                drawing_direction: WallhackDrawingDirection::ToRight,
                 custom_image_path: "".to_owned(),
                 printed_room_id: false,
                 previous_chunk_data_timestamp: None
@@ -227,14 +232,12 @@ impl State {
 
                     // get offset for chunks
 
-                    let x_off = ((input.mouse_position().x - self.pan.x) / 256.0) as i32;
-                    let y_off = ((input.mouse_position().y - self.pan.y) / 256.0) as i32;
+                    let x_off = ((input.mouse_position().x + self.viewport.pan().x) / 256.0) as i32;
+                    let y_off = ((input.mouse_position().y + self.viewport.pan().y) / 256.0) as i32;
 
                     log!(self.log, "[WallhackD] [Custom Image] Starting on chunks {}, {}", x_off, y_off);
 
                     // process everything
-
-                    std::fs::create_dir_all("ncc_cache").unwrap();
 
                     let mut image_to_insert: image::RgbaImage = Default::default();
 
@@ -293,28 +296,24 @@ impl State {
                                 channels[3] = bgra[3];
                             }
 
-                            image_to_insert
-                                .save(format!("ncc_cache/trl{}{}.png", x, y))
-                                .unwrap();
+                            let pos = match self.wallhackd.drawing_direction {
+                                WallhackDrawingDirection::ToLeft => ((x as i32 + x_off as i32) - width_parts as i32, y_off as i32 + y as i32),
+                                WallhackDrawingDirection::ToRight => (x as i32 + x_off as i32, y_off as i32 + y as i32)
+                            };
 
-                            // load
+                            self.paint_canvas.ensure_chunk_exists(pos);
+                            let chk = self.paint_canvas.chunks.get_mut(&pos).unwrap();
+                            let mut chunk_image = chk.as_image_buffer_mut();
 
-                            let data_fs = fs::read(format!("ncc_cache/trl{}{}.png", x, y)).unwrap();
-                            let data = data_fs.as_bytes();
-
-                            self.paint_canvas
-                                .decode_png_data(
-                                    (x as i32 + x_off as i32, y_off as i32 + y as i32),
-                                    data,
-                                )
-                                .unwrap();
+                            let sb = image_to_insert.view(0, 0, 256, 256);
+                            chunk_image.copy_from(&sb, 0, 0).unwrap();
 
                             for addr in self.peer.mates() {
                                 self.peer
                                     .send_canvas_data(
                                         *addr.0,
-                                        (x as i32 + x_off as i32, y_off as i32 + y as i32),
-                                        data.to_vec(),
+                                        pos,
+                                        chk.png_data().unwrap().to_vec(),
                                     )
                                     .unwrap();
                             }
@@ -542,6 +541,24 @@ impl State {
                 }
                 None => log!(self.log, "[WallhackD] U selected nothing"),
             };
+        }
+
+        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
+            height: 32.0,
+            colors: &self.assets.colors.tool_button,
+        }, match self.wallhackd.drawing_direction {
+            WallhackDrawingDirection::ToLeft => &self.assets.icons.wallhackd.backwards,
+            WallhackDrawingDirection::ToRight => &self.assets.icons.wallhackd.forward
+        },
+        format!("Drawing direction ({})", match self.wallhackd.drawing_direction {
+            WallhackDrawingDirection::ToLeft => "To left",
+            WallhackDrawingDirection::ToRight => "To right"
+        }),
+        WHDTooltipPos::Top).clicked() {
+            self.wallhackd.drawing_direction = match self.wallhackd.drawing_direction {
+                WallhackDrawingDirection::ToLeft => WallhackDrawingDirection::ToRight,
+                WallhackDrawingDirection::ToRight => WallhackDrawingDirection::ToLeft
+            }
         }
 
 
