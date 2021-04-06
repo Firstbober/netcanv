@@ -1,4 +1,4 @@
-pub const WALLHACKD_VERSION: &str = "1.0.6";
+pub const WALLHACKD_VERSION: &str = "1.1";
 
 pub struct WallhackDCommandline {
 	pub headless_client: bool,

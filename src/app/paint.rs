@@ -421,18 +421,41 @@ impl State {
             let pan = self.viewport.pan();
             let position = format!("{}, {}", (pan.x / 256.0).floor(), (pan.y / 256.0).floor());
             self.ui.push_group(self.ui.size(), Layout::Freeform);
-            self.ui.pad((32.0, 32.0));
-            self.ui.push_group((72.0, 32.0), Layout::Freeform);
-            self.ui.fill(canvas, Color::BLACK.with_a(128));
-            self.ui.text(canvas, &position, Color::WHITE, (AlignH::Center, AlignV::Middle));
-            self.ui.pop_group();
+                self.ui.pad((32.0, 32.0));
+                self.ui.push_group((72.0, 46.0), Layout::Vertical);
+                    self.ui.fill(canvas, Color::BLACK.with_a(128));
+                    self.ui.pad((0.0, 8.0));
+
+                    self.ui.push_group((self.ui.width(), 20.0), Layout::Vertical);
+                        self.ui.text(canvas, &position, Color::WHITE, (AlignH::Center, AlignV::Middle));
+                    self.ui.pop_group();
+
+                    self.ui.space(2.0);
+
+                    let last_fs = self.ui.font_size();
+                    self.ui.set_font_size(12.0);
+
+                    self.ui.push_group((self.ui.width(), 16.0), Layout::Vertical);
+                        self.ui.text(canvas, &format!("L: {}", self.paint_canvas.chunks.len()), Color::WHITE.with_a(128), (AlignH::Center, AlignV::Middle));
+                    self.ui.pop_group();
+
+                    self.ui.set_font_size(last_fs);
+                self.ui.pop_group();
             self.ui.pop_group();
         }
+
+        /*
+        self.ui.push_group((self.ui.width(), self.ui.height()), Layout::Vertical);
+        self.ui.fill(canvas, self.assets.colors.panel);
+        self.ui.pop_group();
+        */
 
         self.process_log(canvas);
 
         self.ui.pop_group();
     }
+
+    fn whd_process_overlay() {}
 
     fn process_bar(&mut self, canvas: &mut Canvas, input: &mut Input) {
         if self.paint_mode != PaintMode::None {
