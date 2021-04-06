@@ -527,6 +527,17 @@ impl State {
                 ColorSchemeType::Light => self.assets.colors = ColorScheme::whd_dark()
             };
         }
+
+        self.ui.space(6.0);
+
+        if Button::with_icon_and_tooltip(
+            &mut self.ui, canvas, input, ButtonArgs {
+                height: 32.0,
+                colors: &self.assets.colors.tool_button,
+            }, &self.assets.icons.wallhackd.wallhackd,
+            "WallhackD".to_owned(),
+            WHDTooltipPos::Left
+        ).clicked() {}
     }
 }
 

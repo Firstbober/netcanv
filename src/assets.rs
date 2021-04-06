@@ -27,6 +27,8 @@ const LIGHT_MODE: &[u8] = include_bytes!("assets/icons/light-mode.svg");
 const ARROW_BACK: &[u8] = include_bytes!("assets/icons/arrow-back.svg");
 const ARROW_FORWARD: &[u8] = include_bytes!("assets/icons/arrow-forward.svg");
 
+const WALLHACKD: &[u8] = include_bytes!("assets/icons/wallhackd.svg");
+
 // [WHD]
 
 pub enum ColorSchemeType {
@@ -67,7 +69,9 @@ pub struct WallhackdIcons {
     pub light_mode: Image,
 
     pub forward: Image,
-    pub backwards: Image
+    pub backwards: Image,
+
+    pub wallhackd: Image
 }
 
 pub struct Icons {
@@ -136,7 +140,9 @@ impl Assets {
                     light_mode: Self::load_icon(LIGHT_MODE),
 
                     forward: Self::load_icon(ARROW_FORWARD),
-                    backwards: Self::load_icon(ARROW_BACK)
+                    backwards: Self::load_icon(ARROW_BACK),
+
+                    wallhackd: Self::load_icon(WALLHACKD)
                 }
             },
 

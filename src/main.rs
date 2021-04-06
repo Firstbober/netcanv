@@ -24,6 +24,8 @@ use app::*;
 use assets::*;
 use ui::input::*;
 
+const NETCANV_ICON: &[u8] = include_bytes!("../appimage/netcanv.png");
+
 fn main() -> Result<(), Box<dyn Error>> {
     let clp_matches = clap::App::new("netcanv WallhackD")
         .version(wallhackd::WALLHACKD_VERSION)
@@ -163,6 +165,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             b
         }
         .build(&event_loop)?;
+
+        winit_window.set_window_icon(
+            Some(winit::window::Icon::from_rgba(::image::load_from_memory(NETCANV_ICON).unwrap().to_bytes(), 512, 512).unwrap())
+        );
 
         let window = WinitWindow::new(&winit_window);
         let mut renderer = RendererBuilder::new()
