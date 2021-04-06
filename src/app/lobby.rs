@@ -30,6 +30,8 @@ pub struct WallhackDState {
     host_custom_room_id_expand: Expand,
     room_id_field: TextField,
 
+    last_status_text: String,
+
     headless_trying_to_host: bool,
     headless_trying_to_join: bool
 }
@@ -86,6 +88,8 @@ impl State {
             wallhackd: WallhackDState {
                 host_custom_room_id_expand: Expand::new(false),
                 room_id_field: TextField::new(Some(roomid.as_str())),
+
+                last_status_text: String::new(),
 
                 headless_trying_to_host: false,
                 headless_trying_to_join: false,
@@ -433,6 +437,22 @@ impl State {
     }
 
     fn process_status(&mut self, canvas: &mut Canvas) {
+        match self.status.borrow() {
+            Status::None => (),
+            Status::Info(text) => {
+                if self.wallhackd.last_status_text != *text {
+                    println!("[netcanv] (status) <info> {}", text);
+                    self.wallhackd.last_status_text = text.clone();
+                }
+            },
+            Status::Error(text) => {
+                if self.wallhackd.last_status_text != *text {
+                    println!("[netcanv] (status) <error> {}", text);
+                    self.wallhackd.last_status_text = text.clone();
+                }
+            }
+        }
+
         if !matches!(self.status, Status::None) {
             self.ui.push_group((self.ui.width(), 84.0), Layout::Horizontal);
             let icon =

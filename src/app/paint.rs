@@ -82,7 +82,10 @@ const COLOR_PALETTE: &'static [u32] = &[
 
 macro_rules! log {
     ($log:expr, $($arg:tt)*) => {
-        $log.push((format!($($arg)*), Instant::now()))
+        {
+            $log.push((format!($($arg)*), Instant::now()));
+            println!("[netcanv] {}", format!($($arg)*));
+        }
     };
 }
 
