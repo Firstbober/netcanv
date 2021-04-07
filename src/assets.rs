@@ -29,6 +29,8 @@ const ARROW_FORWARD: &[u8] = include_bytes!("assets/icons/arrow-forward.svg");
 
 const WALLHACKD: &[u8] = include_bytes!("assets/icons/wallhackd.svg");
 
+const PIN_DROP: &[u8] = include_bytes!("assets/icons/pin-drop.svg");
+
 // [WHD]
 
 pub enum ColorSchemeType {
@@ -71,7 +73,9 @@ pub struct WHDIcons {
     pub forward: Image,
     pub backwards: Image,
 
-    pub wallhackd: Image
+    pub wallhackd: Image,
+
+    pub pin_drop: Image
 }
 
 pub struct Icons {
@@ -142,7 +146,9 @@ impl Assets {
                     forward: Self::load_icon(ARROW_FORWARD),
                     backwards: Self::load_icon(ARROW_BACK),
 
-                    wallhackd: Self::load_icon(WALLHACKD)
+                    wallhackd: Self::load_icon(WALLHACKD),
+
+                    pin_drop: Self::load_icon(PIN_DROP)
                 }
             },
 
@@ -217,14 +223,14 @@ impl ColorScheme {
     }
 
     pub fn whd_dark() -> Self {
-        let accent = 0xffFF9800;
+        let accent = 0xffF57C00;
 
-        let tooltip_bg = Color::new(0xffeeeeee);
-        let tooltip_text = Color::new(0xc5141414);
+        let tooltip_bg = Color::new(0xfff2f2ec);
+        let tooltip_text = Color::new(0xc50f1214);
 
         Self {
-            text: Color::new(0xffeeeeee),
-            panel: Color::new(0xc5141414),
+            text: Color::new(0xfff2f2ec),
+            panel: Color::new(0xc50f1214),
             panel2: Color::new(0xffffffff),
             separator: Color::new(0xffFF5722),
             error: Color::new(0xffF44336),
@@ -240,7 +246,7 @@ impl ColorScheme {
             },
             tool_button: ButtonColors {
                 outline: Color::new(0x00000000),
-                text: Color::new(0xffeeeeee),
+                text: Color::new(0xfff2f2ec),
                 hover: Color::new(0x30ffffff),
                 pressed: Color::new(0x60000000),
 
@@ -250,17 +256,17 @@ impl ColorScheme {
             slider: Color::new(accent),
             expand: ExpandColors {
                 icon: Color::new(accent),
-                text: Color::new(0xffeeeeee),
+                text: Color::new(0xfff2f2ec),
                 hover: Color::new(accent),
                 pressed: Color::new(0x60000000),
             },
             text_field: TextFieldColors {
-                outline: Color::new(0xffeeeeee),
+                outline: Color::new(0xff3b3f44),
                 outline_focus: Color::new(0xffd4d4d4),
-                fill: Color::new(0xff171717),
-                text: Color::new(0xffeeeeee),
+                fill: Color::new(0xff191b1f),
+                text: Color::new(0xfff2f2ec),
                 text_hint: Color::new(0xffbababa),
-                label: Color::new(0xffeeeeee),
+                label: Color::new(0xfff2f2ec),
             },
 
             scheme_type: ColorSchemeType::Dark

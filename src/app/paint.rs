@@ -303,6 +303,16 @@ impl wallhackd::WHDPaintFunctions for State {
                 WHDCIDrawingDirection::ToRight => WHDCIDrawingDirection::ToLeft
             }
         }
+
+        if Button::with_icon_and_tooltip(
+            &mut self.ui, canvas, input, ButtonArgs {
+                height: 32.0,
+                colors: &self.assets.colors.tool_button,
+            }, &self.assets.icons.whd.pin_drop,
+            "(WIP) Teleport to chunk".to_owned(),
+            WHDTooltipPos::Top
+        ).clicked() {
+        }
     }
 }
 
