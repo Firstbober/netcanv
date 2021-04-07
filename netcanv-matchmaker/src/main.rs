@@ -217,7 +217,7 @@ impl Matchmaker {
         }
         match packet {
             Packet::Host => Self::host(mm, peer_addr, stream),
-            Packet::WallhackDHostWithCustomRoomId(room_id) => Self::whd_host_with_custom_id(mm, peer_addr, stream, room_id),
+            Packet::WHDHostWithCustomRoomId(room_id) => Self::whd_host_with_custom_id(mm, peer_addr, stream, room_id),
             Packet::GetHost(room_id) => Self::join(mm, &stream, room_id),
             Packet::RequestRelay(host_addr) => Self::add_relay(mm, stream, host_addr),
             Packet::Relay(to, data) => Self::relay(mm, peer_addr, &stream, to, &data),

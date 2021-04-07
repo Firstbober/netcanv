@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .get_matches();
 
-    let mut whd_cmd = wallhackd::WallhackDCommandline {
+    let mut whd_cmd = wallhackd::WHDCommandLine {
         headless_client: false,
         headless_host: false,
 

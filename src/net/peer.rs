@@ -112,7 +112,7 @@ impl Peer {
 
     pub fn whd_host_with_custom_id(nickname: &str, matchmaker_addr: &str, room_id: u32) -> Result<Self, Error> {
         let mm = Remote::new(matchmaker_addr)?;
-        mm.send(mm::Packet::WallhackDHostWithCustomRoomId(room_id))?;
+        mm.send(mm::Packet::WHDHostWithCustomRoomId(room_id))?;
 
         Ok(Self {
             matchmaker: Some(mm),

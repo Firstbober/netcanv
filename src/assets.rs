@@ -61,7 +61,7 @@ pub struct FileIcons {
     pub save: Image,
 }
 
-pub struct WallhackdIcons {
+pub struct WHDIcons {
     pub load_image: Image,
     pub draw_it_again: Image,
 
@@ -78,7 +78,7 @@ pub struct Icons {
     pub expand: ExpandIcons,
     pub status: StatusIcons,
     pub file: FileIcons,
-    pub wallhackd: WallhackdIcons
+    pub whd: WHDIcons
 }
 
 pub struct Assets {
@@ -88,7 +88,7 @@ pub struct Assets {
     pub colors: ColorScheme,
     pub icons: Icons,
 
-    pub wallhackd_commandline: wallhackd::WallhackDCommandline
+    pub whd_commandline: wallhackd::WHDCommandLine
 }
 
 impl Assets {
@@ -132,7 +132,7 @@ impl Assets {
                 file: FileIcons {
                     save: Self::load_icon(SAVE_SVG),
                 },
-                wallhackd: WallhackdIcons {
+                whd: WHDIcons {
                     load_image: Self::load_icon(ADD_PHOTO_ALTERNATE),
                     draw_it_again: Self::load_icon(REPLAY),
 
@@ -146,7 +146,7 @@ impl Assets {
                 }
             },
 
-            wallhackd_commandline: wallhackd::WallhackDCommandline {
+            whd_commandline: wallhackd::WHDCommandLine {
                 headless_client: false,
                 headless_host: false,
 
@@ -160,8 +160,8 @@ impl Assets {
         }
     }
 
-    pub fn whd_add_commandline(&mut self, cmd: wallhackd::WallhackDCommandline) {
-        self.wallhackd_commandline = cmd;
+    pub fn whd_add_commandline(&mut self, cmd: wallhackd::WHDCommandLine) {
+        self.whd_commandline = cmd;
     }
 
 }

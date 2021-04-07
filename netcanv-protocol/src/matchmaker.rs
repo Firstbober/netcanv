@@ -47,9 +47,9 @@ pub enum Packet {
     // an error occured
     Error(String),
 
-    // [WallhackD] request from the host to the matchmaker
+    // [WHD] request from the host to the matchmaker
     // to make match on custom ID
-    WallhackDHostWithCustomRoomId(u32),
+    WHDHostWithCustomRoomId(u32),
 }
 
 // fast way to create an error packet

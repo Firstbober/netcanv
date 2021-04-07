@@ -8,7 +8,7 @@ use native_dialog::FileDialog;
 use skulpin::skia_safe::*;
 use skulpin::skia_safe::paint as skpaint;
 
-use crate::app::*;
+use crate::{app::*, wallhackd::{self, WHDPaintFunctions}};
 use crate::assets::*;
 use crate::paint_canvas::*;
 use crate::ui::*;
@@ -26,19 +26,19 @@ enum PaintMode {
     None,
     Paint,
     Erase,
-    WallhackDCustomImage
+    WHDCustomImage
 }
 
 type Log = Vec<(String, Instant)>;
 
-pub enum WallhackDrawingDirection {
+pub enum WHDCIDrawingDirection {
     ToLeft,
     ToRight
 }
 
-pub struct WallhackDState {
+pub struct WHDState {
     custom_image_path: String,
-    drawing_direction: WallhackDrawingDirection,
+    drawing_direction: WHDCIDrawingDirection,
     printed_room_id: bool,
 
     previous_chunk_data_timestamp: Option<SystemTime>,
@@ -68,7 +68,7 @@ pub struct State {
     panning: bool,
     viewport: Viewport,
 
-    wallhackd: WallhackDState
+    whd: WHDState
 }
 
 const COLOR_PALETTE: &'static [u32] = &[
@@ -101,6 +101,211 @@ macro_rules! ok_or_log {
     };
 }
 
+impl wallhackd::WHDPaintFunctions for State {
+    fn whd_process_canvas_start(&mut self, _canvas: &mut Canvas, _input: &Input) {
+        if self.assets.whd_commandline.headless_client {
+            let sc = self.assets.whd_commandline.save_canvas.clone();
+
+            if sc.is_some() && self.whd.previous_chunk_data_timestamp.is_some() {
+                match self.whd.previous_chunk_data_timestamp.unwrap().elapsed() {
+                    Ok(time) => {
+                        if time.as_secs() > 120 {
+                            match self.paint_canvas.save(&PathBuf::from(sc.unwrap())) {
+                                Ok(_) => {
+                                    println!("Saved canvas to file!");
+                                    std::process::exit(0);
+                                },
+                                Err(err) => {
+                                    println!("Failed to save canvas! Reason: {}", err);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                    },
+                    Err(_err) => std::process::exit(1)
+                }
+            }
+        }
+    }
+
+	fn whd_process_canvas_end(&mut self, _canvas: &mut Canvas, _input: &Input) {}
+
+    fn whd_process_canvas_custom_image(&mut self, input: &Input) {
+        log!(self.log, "[WallhackD] [Custom Image] Started!");
+
+        // get image from file
+
+        let mut trollage = image::open(self.whd.custom_image_path.as_str()).unwrap();
+        let dm = trollage.dimensions();
+
+        // calculate parts
+
+        let width_parts = if dm.0 % 256 != 0 {
+            (dm.0 / 256) + 1
+        } else {
+            dm.0 / 256
+        };
+
+        let height_parts = if dm.1 % 256 != 0 {
+            (dm.1 / 256) + 1
+        } else {
+            dm.1 / 256
+        };
+
+        log!(self.log, "[WallhackD] [Custom Image] {} parts will be needed", width_parts * height_parts);
+
+        // get offset for chunks
+
+        let x_off = ((input.mouse_position().x + self.viewport.pan().x) / 256.0) as i32;
+        let y_off = ((input.mouse_position().y + self.viewport.pan().y) / 256.0) as i32;
+
+        log!(self.log, "[WallhackD] [Custom Image] Starting on chunks {}, {}", x_off, y_off);
+
+        // process everything
+
+        let mut image_to_insert: image::RgbaImage = Default::default();
+
+        for x in 0..width_parts {
+            for y in 0..height_parts {
+                if y == height_parts - 1 && x == width_parts - 1 {
+                    let part = SubImage::new(
+                        trollage.borrow_mut(),
+                        x * 256,
+                        y * 256,
+                        dm.0 - x * 256,
+                        dm.1 - y * 256,
+                    );
+                    image_to_insert = image::ImageBuffer::new(256, 256);
+                    image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
+                } else if y == height_parts - 1 {
+                    let part = SubImage::new(
+                        trollage.borrow_mut(),
+                        x * 256,
+                        y * 256,
+                        256,
+                        dm.1 - y * 256,
+                    );
+                    image_to_insert = image::ImageBuffer::new(256, 256);
+                    image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
+                } else if x == width_parts - 1 {
+                    let part = SubImage::new(
+                        trollage.borrow_mut(),
+                        x * 256,
+                        y * 256,
+                        dm.0 - x * 256,
+                        256,
+                    );
+                    image_to_insert = image::ImageBuffer::new(256, 256);
+                    image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
+                } else {
+                    let part = SubImage::new(
+                        trollage.borrow_mut(),
+                        x * 256,
+                        y * 256,
+                        256,
+                        256,
+                    );
+                    image_to_insert = part.to_image();
+                }
+
+                // change to bgra
+
+                for px in image_to_insert.pixels_mut() {
+                    let bgra = px.to_bgra();
+                    let channels = px.channels_mut();
+
+                    channels[0] = bgra[0];
+                    channels[1] = bgra[1];
+                    channels[2] = bgra[2];
+                    channels[3] = bgra[3];
+                }
+
+                let pos = match self.whd.drawing_direction {
+                    WHDCIDrawingDirection::ToLeft => ((x as i32 + x_off as i32) - width_parts as i32, y_off as i32 + y as i32),
+                    WHDCIDrawingDirection::ToRight => (x as i32 + x_off as i32, y_off as i32 + y as i32)
+                };
+
+                self.paint_canvas.ensure_chunk_exists(pos);
+                let chk = self.paint_canvas.chunks.get_mut(&pos).unwrap();
+                let mut chunk_image = chk.as_image_buffer_mut();
+
+                let sb = image_to_insert.view(0, 0, 256, 256);
+                chunk_image.copy_from(&sb, 0, 0).unwrap();
+
+                for addr in self.peer.mates() {
+                    self.peer
+                        .send_canvas_data(
+                            *addr.0,
+                            pos,
+                            chk.png_data().unwrap().to_vec(),
+                        )
+                        .unwrap();
+                }
+            }
+        }
+
+        log!(self.log, "[WallhackD] [Custom Image] Completed!");
+    }
+
+    fn whd_process_overlay(&mut self, canvas: &mut Canvas, input: &Input) {
+        self.ui.push_group((self.ui.width(), self.ui.height()), Layout::Vertical);
+        //self.ui.fill(canvas, self.assets.colors.panel);
+        self.ui.pop_group();
+    }
+
+    fn whd_bar_end_buttons(&mut self, canvas: &mut Canvas, input: &Input) {
+        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
+            height: 32.0,
+            colors: &self.assets.colors.tool_button,
+        }, &self.assets.icons.whd.draw_it_again,
+        "Draw again".to_owned(),
+        WHDTooltipPos::Top).clicked() {
+            self.paint_mode = PaintMode::WHDCustomImage;
+        }
+
+        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
+            height: 32.0,
+            colors: &self.assets.colors.tool_button,
+        }, &self.assets.icons.whd.load_image,
+        "Draw image".to_owned(),
+        WHDTooltipPos::Top).clicked() {
+            let path = FileDialog::new()
+                .set_location(std::env::current_dir().unwrap().as_path())
+                .add_filter("Image", &["png", "jpg", "jpeg", "webp"])
+                .show_open_single_file()
+                .unwrap();
+
+            match path {
+                Some(path) => {
+                    log!(self.log, "[WallhackD] [Custom Image] Got image path");
+
+                    self.paint_mode = PaintMode::WHDCustomImage;
+                    self.whd.custom_image_path = String::from_str(path.to_str().unwrap()).unwrap();
+                }
+                None => log!(self.log, "[WallhackD] U selected nothing"),
+            };
+        }
+
+        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
+            height: 32.0,
+            colors: &self.assets.colors.tool_button,
+        }, match self.whd.drawing_direction {
+            WHDCIDrawingDirection::ToLeft => &self.assets.icons.whd.backwards,
+            WHDCIDrawingDirection::ToRight => &self.assets.icons.whd.forward
+        },
+        format!("Drawing direction ({})", match self.whd.drawing_direction {
+            WHDCIDrawingDirection::ToLeft => "To left",
+            WHDCIDrawingDirection::ToRight => "To right"
+        }),
+        WHDTooltipPos::Top).clicked() {
+            self.whd.drawing_direction = match self.whd.drawing_direction {
+                WHDCIDrawingDirection::ToLeft => WHDCIDrawingDirection::ToRight,
+                WHDCIDrawingDirection::ToRight => WHDCIDrawingDirection::ToLeft
+            }
+        }
+    }
+}
+
 impl State {
 
     const BAR_SIZE: f32 = 32.0;
@@ -131,8 +336,8 @@ impl State {
             panning: false,
             viewport: Viewport::new(),
 
-            wallhackd: WallhackDState {
-                drawing_direction: WallhackDrawingDirection::ToRight,
+            whd: WHDState {
+                drawing_direction: WHDCIDrawingDirection::ToRight,
                 custom_image_path: "".to_owned(),
                 printed_room_id: false,
                 previous_chunk_data_timestamp: None
@@ -178,29 +383,7 @@ impl State {
     }
 
     fn process_canvas(&mut self, canvas: &mut Canvas, input: &Input) {
-        if self.assets.wallhackd_commandline.headless_client {
-            let sc = self.assets.wallhackd_commandline.save_canvas.clone();
-
-            if sc.is_some() && self.wallhackd.previous_chunk_data_timestamp.is_some() {
-                match self.wallhackd.previous_chunk_data_timestamp.unwrap().elapsed() {
-                    Ok(time) => {
-                        if time.as_secs() > 120 {
-                            match self.paint_canvas.save(&PathBuf::from(sc.unwrap())) {
-                                Ok(_) => {
-                                    println!("Saved canvas to file!");
-                                    std::process::exit(0);
-                                },
-                                Err(err) => {
-                                    println!("Failed to save canvas! Reason: {}", err);
-                                    std::process::exit(1);
-                                }
-                            }
-                        }
-                    },
-                    Err(_err) => std::process::exit(1)
-                }
-            }
-        }
+        self.whd_process_canvas_start(canvas, input);
 
         self.ui.push_group((self.ui.width(), self.ui.height() - Self::BAR_SIZE), Layout::Freeform);
         let canvas_size = self.ui.size();
@@ -213,123 +396,10 @@ impl State {
 
         if self.ui.has_mouse(input) {
             if input.mouse_button_just_pressed(MouseButton::Left) {
-                if self.paint_mode != PaintMode::WallhackDCustomImage {
+                if self.paint_mode != PaintMode::WHDCustomImage {
                     self.paint_mode = PaintMode::Paint;
                 } else {
-                    log!(self.log, "[WallhackD] [Custom Image] Started!");
-
-                    // get image from file
-
-                    let mut trollage = image::open(self.wallhackd.custom_image_path.as_str()).unwrap();
-                    let dm = trollage.dimensions();
-
-                    // calculate parts
-
-                    let width_parts = if dm.0 % 256 != 0 {
-                        (dm.0 / 256) + 1
-                    } else {
-                        dm.0 / 256
-                    };
-
-                    let height_parts = if dm.1 % 256 != 0 {
-                        (dm.1 / 256) + 1
-                    } else {
-                        dm.1 / 256
-                    };
-
-                    log!(self.log, "[WallhackD] [Custom Image] {} parts will be needed", width_parts * height_parts);
-
-                    // get offset for chunks
-
-                    let x_off = ((input.mouse_position().x + self.viewport.pan().x) / 256.0) as i32;
-                    let y_off = ((input.mouse_position().y + self.viewport.pan().y) / 256.0) as i32;
-
-                    log!(self.log, "[WallhackD] [Custom Image] Starting on chunks {}, {}", x_off, y_off);
-
-                    // process everything
-
-                    let mut image_to_insert: image::RgbaImage = Default::default();
-
-                    for x in 0..width_parts {
-                        for y in 0..height_parts {
-                            if y == height_parts - 1 && x == width_parts - 1 {
-                                let part = SubImage::new(
-                                    trollage.borrow_mut(),
-                                    x * 256,
-                                    y * 256,
-                                    dm.0 - x * 256,
-                                    dm.1 - y * 256,
-                                );
-                                image_to_insert = image::ImageBuffer::new(256, 256);
-                                image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
-                            } else if y == height_parts - 1 {
-                                let part = SubImage::new(
-                                    trollage.borrow_mut(),
-                                    x * 256,
-                                    y * 256,
-                                    256,
-                                    dm.1 - y * 256,
-                                );
-                                image_to_insert = image::ImageBuffer::new(256, 256);
-                                image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
-                            } else if x == width_parts - 1 {
-                                let part = SubImage::new(
-                                    trollage.borrow_mut(),
-                                    x * 256,
-                                    y * 256,
-                                    dm.0 - x * 256,
-                                    256,
-                                );
-                                image_to_insert = image::ImageBuffer::new(256, 256);
-                                image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
-                            } else {
-                                let part = SubImage::new(
-                                    trollage.borrow_mut(),
-                                    x * 256,
-                                    y * 256,
-                                    256,
-                                    256,
-                                );
-                                image_to_insert = part.to_image();
-                            }
-
-                            // change to bgra
-
-                            for px in image_to_insert.pixels_mut() {
-                                let bgra = px.to_bgra();
-                                let channels = px.channels_mut();
-
-                                channels[0] = bgra[0];
-                                channels[1] = bgra[1];
-                                channels[2] = bgra[2];
-                                channels[3] = bgra[3];
-                            }
-
-                            let pos = match self.wallhackd.drawing_direction {
-                                WallhackDrawingDirection::ToLeft => ((x as i32 + x_off as i32) - width_parts as i32, y_off as i32 + y as i32),
-                                WallhackDrawingDirection::ToRight => (x as i32 + x_off as i32, y_off as i32 + y as i32)
-                            };
-
-                            self.paint_canvas.ensure_chunk_exists(pos);
-                            let chk = self.paint_canvas.chunks.get_mut(&pos).unwrap();
-                            let mut chunk_image = chk.as_image_buffer_mut();
-
-                            let sb = image_to_insert.view(0, 0, 256, 256);
-                            chunk_image.copy_from(&sb, 0, 0).unwrap();
-
-                            for addr in self.peer.mates() {
-                                self.peer
-                                    .send_canvas_data(
-                                        *addr.0,
-                                        pos,
-                                        chk.png_data().unwrap().to_vec(),
-                                    )
-                                    .unwrap();
-                            }
-                        }
-                    }
-
-                    log!(self.log, "[WallhackD] [Custom Image] Completed!");
+                    self.whd_process_canvas_custom_image(input);
                 }
             } else if input.mouse_button_just_pressed(MouseButton::Right) {
                 self.paint_mode = PaintMode::Erase;
@@ -345,7 +415,7 @@ impl State {
         loop { // give me back my labelled blocks
             let brush = match self.paint_mode {
                 PaintMode::None => break,
-                PaintMode::WallhackDCustomImage => break,
+                PaintMode::WHDCustomImage => break,
                 PaintMode::Paint =>
                     Brush::Draw {
                         color: self.paint_color.clone(),
@@ -450,11 +520,7 @@ impl State {
             self.ui.pop_group();
         }
 
-        /*
-        self.ui.push_group((self.ui.width(), self.ui.height()), Layout::Vertical);
-        self.ui.fill(canvas, self.assets.colors.panel);
-        self.ui.pop_group();
-        */
+        self.whd_process_overlay(canvas, input);
 
         self.process_log(canvas);
 
@@ -470,9 +536,9 @@ impl State {
                 self.downloaded_chunks.insert(chunk_position);
             }
         }
-    }
 
-    fn whd_process_overlay() {}
+        self.whd_process_canvas_end(canvas, input);
+    }
 
     fn process_bar(&mut self, canvas: &mut Canvas, input: &mut Input) {
         if self.paint_mode != PaintMode::None {
@@ -554,61 +620,13 @@ impl State {
             }
         }
 
-        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
-            height: 32.0,
-            colors: &self.assets.colors.tool_button,
-        }, &self.assets.icons.wallhackd.draw_it_again,
-        "Draw again".to_owned(),
-        WHDTooltipPos::Top).clicked() {
-            self.paint_mode = PaintMode::WallhackDCustomImage;
-        }
-
-        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
-            height: 32.0,
-            colors: &self.assets.colors.tool_button,
-        }, &self.assets.icons.wallhackd.load_image,
-        "Draw image".to_owned(),
-        WHDTooltipPos::Top).clicked() {
-            let path = FileDialog::new()
-                .set_location(std::env::current_dir().unwrap().as_path())
-                .add_filter("Image", &["png", "jpg", "jpeg", "webp"])
-                .show_open_single_file()
-                .unwrap();
-
-            match path {
-                Some(path) => {
-                    log!(self.log, "[WallhackD] [Custom Image] Got image path");
-
-                    self.paint_mode = PaintMode::WallhackDCustomImage;
-                    self.wallhackd.custom_image_path = String::from_str(path.to_str().unwrap()).unwrap();
-                }
-                None => log!(self.log, "[WallhackD] U selected nothing"),
-            };
-        }
-
-        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
-            height: 32.0,
-            colors: &self.assets.colors.tool_button,
-        }, match self.wallhackd.drawing_direction {
-            WallhackDrawingDirection::ToLeft => &self.assets.icons.wallhackd.backwards,
-            WallhackDrawingDirection::ToRight => &self.assets.icons.wallhackd.forward
-        },
-        format!("Drawing direction ({})", match self.wallhackd.drawing_direction {
-            WallhackDrawingDirection::ToLeft => "To left",
-            WallhackDrawingDirection::ToRight => "To right"
-        }),
-        WHDTooltipPos::Top).clicked() {
-            self.wallhackd.drawing_direction = match self.wallhackd.drawing_direction {
-                WallhackDrawingDirection::ToLeft => WallhackDrawingDirection::ToRight,
-                WallhackDrawingDirection::ToRight => WallhackDrawingDirection::ToLeft
-            }
-        }
-
+        // [WHD] Inject buttons
+        self.whd_bar_end_buttons(canvas, input);
 
         if self.peer.is_host() {
-            if !self.wallhackd.printed_room_id {
+            if !self.whd.printed_room_id {
                 println!("Created room with id {:04}!", self.peer.room_id().unwrap());
-                self.wallhackd.printed_room_id = true;
+                self.whd.printed_room_id = true;
             }
 
             // the room ID itself
