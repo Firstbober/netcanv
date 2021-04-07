@@ -22,6 +22,7 @@ pub trait WHDPaintFunctions {
 	fn whd_process_canvas_custom_image(&mut self, input: &ui::Input);
 
 	fn whd_process_overlay(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
+	fn whd_overlay_window(&mut self, canvas: &mut skia::Canvas, input: &ui::Input, size: (f32, f32), margin: f32, title: &str);
 
 	fn whd_bar_end_buttons(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
 }

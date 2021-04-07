@@ -221,8 +221,51 @@ impl wallhackd::WHDPaintFunctions for State {
 
     fn whd_process_overlay(&mut self, canvas: &mut Canvas, input: &Input) {
         self.ui
-            .push_group((self.ui.width(), self.ui.height()), Layout::Vertical);
-        //self.ui.fill(canvas, self.assets.colors.panel);
+            .push_group((self.ui.width(), self.ui.height()), Layout::VerticalRev);
+
+        self.ui.pad((32.0, 32.0));
+
+        //self.whd_overlay_window(canvas, input, (300.0, 200.0), 0.0, "Teleport to chunk");
+
+        self.ui.pop_group();
+    }
+
+    fn whd_overlay_window(&mut self, canvas: &mut Canvas, input: &Input, size: (f32, f32), margin: f32, title: &str) {
+        self.ui.push_group((self.ui.width(), size.1 + 32.0), Layout::HorizontalRev);
+
+        self.ui.pad((margin, 0.0));
+
+        self.ui.push_group((size.0, size.1 + 32.0), Layout::Vertical);
+        self.ui.fill(canvas, Color::BLACK.with_a(200));
+
+        self.ui.push_group((self.ui.width(), 32.0), Layout::Horizontal);
+        self.ui.fill(canvas, Color::BLACK);
+
+        self.ui.text(
+            canvas,
+            title,
+            self.assets.colors.text,
+            (AlignH::Center, AlignV::Middle),
+        );
+        if Button::with_icon_and_tooltip(
+            &mut self.ui,
+            canvas,
+            input,
+            ButtonArgs {
+                height: 32.0,
+                colors: &self.assets.colors.tool_button,
+            },
+            &self.assets.icons.whd.close,
+            "Close".to_owned(),
+            WHDTooltipPos::Top,
+        )
+        .clicked()
+        {}
+
+        self.ui.pop_group();
+
+        self.ui.pop_group();
+
         self.ui.pop_group();
     }
 
