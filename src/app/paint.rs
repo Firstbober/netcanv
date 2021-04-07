@@ -43,8 +43,13 @@ pub struct WHDState {
     custom_image_path: String,
     drawing_direction: WHDCIDrawingDirection,
     printed_room_id: bool,
+    lock_painting: bool,
 
     previous_chunk_data_timestamp: Option<SystemTime>,
+
+    teleport_to_chunk_window: bool,
+    tp_x_textfield: TextField,
+    tp_y_textfield: TextField,
 }
 
 pub struct State {
@@ -153,6 +158,9 @@ impl wallhackd::WHDPaintFunctions for State {
 
         // process everything
 
+        // TODO: Align to mouse position not to chunk
+        // TODO: Remove chunk override
+
         let mut image_to_insert: image::RgbaImage = Default::default();
 
         for x in 0..width_parts {
@@ -211,20 +219,64 @@ impl wallhackd::WHDPaintFunctions for State {
         log!(self.log, "[WallhackD] [Custom Image] Completed!");
     }
 
-    fn whd_process_overlay(&mut self, canvas: &mut Canvas, input: &Input) {
+    fn whd_process_overlay(&mut self, canvas: &mut Canvas, input: &mut Input) {
         self.ui
-            .push_group((self.ui.width(), self.ui.height()), Layout::VerticalRev);
-        self.ui.pad((32.0, 32.0));
+            .push_group((self.ui.width(), self.ui.height()), Layout::Freeform);
 
-        self.whd_overlay_window_begin(
-            canvas,
-            input,
-            (300.0, 200.0),
-            0.0,
-            "Teleport to chunk",
-            wallhackd::OverlayWindowPos::Middle,
-        );
-        self.whd_overlay_window_end();
+        if self.whd.teleport_to_chunk_window {
+            if self.whd_overlay_window_begin(
+                canvas,
+                input,
+                (160.0 + 12.0, 125.0),
+                0.0,
+                "Teleport to chunk",
+                wallhackd::OverlayWindowPos::BottomRight,
+            ) {
+                self.whd.teleport_to_chunk_window = false;
+            }
+
+            self.ui.pad((12.0, 12.0));
+
+            let mut textfield_arg = TextFieldArgs {
+                width: 160.0,
+                colors: &self.assets.colors.text_field,
+                hint: Some("X coord"),
+            };
+            self.whd
+                .tp_x_textfield
+                .process(&mut self.ui, canvas, input, textfield_arg);
+
+            self.ui.space(6.0);
+
+            textfield_arg.hint = Some("Y coord");
+            self.whd
+                .tp_y_textfield
+                .process(&mut self.ui, canvas, input, textfield_arg);
+
+            self.ui.space(10.0);
+
+            if Button::with_text(
+                &mut self.ui,
+                canvas,
+                input,
+                ButtonArgs {
+                    height: 32.0,
+                    colors: &self.assets.colors.button,
+                },
+                "Teleport",
+            )
+            .clicked()
+            {
+                let pr_x = self.whd.tp_x_textfield.text().to_string().parse::<f32>();
+                let pr_y = self.whd.tp_y_textfield.text().to_string().parse::<f32>();
+
+                if !pr_x.is_err() || !pr_y.is_err() {
+                    self.viewport.whd_set_pan(Point::new(pr_x.unwrap() * 256.0, pr_y.unwrap()*256.0));
+                }
+            }
+
+            self.whd_overlay_window_end(input);
+        }
 
         self.ui.pop_group();
     }
@@ -232,50 +284,56 @@ impl wallhackd::WHDPaintFunctions for State {
     fn whd_overlay_window_begin(
         &mut self,
         canvas: &mut Canvas,
-        input: &Input,
+        input: &mut Input,
         size: (f32, f32),
         margin: f32,
         title: &str,
         pos: wallhackd::OverlayWindowPos,
-    ) {
+    ) -> bool {
         let g_height = size.1 + 32.0;
+        let padding = (16.0, 16.0);
 
-        let mut tg_height = g_height;
-        let mut tg_layout = Layout::HorizontalRev;
+        let final_pos = match pos {
+            wallhackd::OverlayWindowPos::Top => (((self.ui.width() / 2.0) - (size.0 / 2.0)), padding.1),
+            wallhackd::OverlayWindowPos::TopLeft => (padding.0, padding.1),
+            wallhackd::OverlayWindowPos::TopRight => ((self.ui.width() - size.0) - padding.0, padding.1),
 
-        match pos {
-            wallhackd::OverlayWindowPos::Top => {
-                tg_height = self.ui.remaining_height();
-                self.ui.pad((self.ui.remaining_width() - size.0, 0.0));
-            }
-            wallhackd::OverlayWindowPos::TopLeft => {
-                tg_height = self.ui.remaining_height();
-                tg_layout = Layout::Horizontal
-            }
-            wallhackd::OverlayWindowPos::TopRight => {
-                tg_height = self.ui.remaining_height();
-            }
+            wallhackd::OverlayWindowPos::Middle => (
+                ((self.ui.width() / 2.0) - (size.0 / 2.0)),
+                ((self.ui.height() / 2.0) - (g_height / 2.0)),
+            ),
+            wallhackd::OverlayWindowPos::MiddleLeft => (padding.0, ((self.ui.height() / 2.0) - (g_height / 2.0))),
+            wallhackd::OverlayWindowPos::MiddleRight => (
+                (self.ui.width() - size.0) - padding.0,
+                ((self.ui.height() / 2.0) - (g_height / 2.0)),
+            ),
 
-            wallhackd::OverlayWindowPos::Middle => {
-                tg_height = (self.ui.height() / 2.0) + (g_height / 2.0);
-                self.ui.pad((self.ui.remaining_width() - size.0, 0.0));
-            }
-            wallhackd::OverlayWindowPos::MiddleLeft => {
-                tg_height = (self.ui.height() / 2.0) + (g_height / 2.0);
-                tg_layout = Layout::Horizontal
-            }
-            wallhackd::OverlayWindowPos::MiddleRight => {
-                tg_height = (self.ui.height() / 2.0) + (g_height / 2.0);
-            }
+            wallhackd::OverlayWindowPos::Bottom => (
+                ((self.ui.width() / 2.0) - (size.0 / 2.0)),
+                (self.ui.height() - g_height) - padding.1,
+            ),
+            wallhackd::OverlayWindowPos::BottomLeft => (padding.0, (self.ui.height() - g_height) - padding.1),
+            wallhackd::OverlayWindowPos::BottomRight => (
+                (self.ui.width() - size.0) - padding.0,
+                (self.ui.height() - g_height) - padding.1,
+            ),
+        };
 
-            wallhackd::OverlayWindowPos::Bottom => {
-                self.ui.pad((self.ui.remaining_width() - size.0, 0.0));
-            }
-            wallhackd::OverlayWindowPos::BottomLeft => tg_layout = Layout::Horizontal,
-            wallhackd::OverlayWindowPos::BottomRight => {}
+        self.ui.set_absolute_position(final_pos);
+
+        let mouse_pos = self.ui.mouse_position(input);
+        let coll_padding = (16.0, 16.0);
+
+        if (mouse_pos.x > -coll_padding.0 && mouse_pos.x < size.0 + coll_padding.0)
+            && (mouse_pos.y > -coll_padding.1 && mouse_pos.y < g_height + coll_padding.1)
+        {
+            self.paint_mode = PaintMode::None;
+            self.whd.lock_painting = true;
+        } else {
+            self.whd.lock_painting = false;
         }
 
-        self.ui.push_group((self.ui.width(), tg_height), tg_layout);
+        self.ui.push_group((size.0, g_height), Layout::HorizontalRev);
 
         self.ui.pad((margin, 0.0));
 
@@ -286,7 +344,9 @@ impl wallhackd::WHDPaintFunctions for State {
         self.ui.fill(canvas, Color::BLACK);
 
         self.ui
-            .text(canvas, title, self.assets.colors.text, (AlignH::Center, AlignV::Middle));
+            .text(canvas, format!("   {}", title).as_str(), self.assets.colors.text, (AlignH::Left, AlignV::Middle));
+
+        let mut res = false;
         if Button::with_icon_and_tooltip(
             &mut self.ui,
             canvas,
@@ -300,15 +360,19 @@ impl wallhackd::WHDPaintFunctions for State {
             WHDTooltipPos::Top,
         )
         .clicked()
-        {}
+        {
+            self.whd.lock_painting = false;
+            res = true;
+        }
 
         self.ui.pop_group();
-        self.ui.pop_group();
-
         self.ui.push_group(size, Layout::Vertical);
+
+        res
     }
 
-    fn whd_overlay_window_end(&mut self) {
+    fn whd_overlay_window_end(&mut self, _input: &mut Input) {
+        self.ui.pop_group();
         self.ui.pop_group();
         self.ui.pop_group();
     }
@@ -400,11 +464,13 @@ impl wallhackd::WHDPaintFunctions for State {
                 colors: &self.assets.colors.tool_button,
             },
             &self.assets.icons.whd.pin_drop,
-            "(WIP) Teleport to chunk".to_owned(),
+            "Teleport to chunk".to_owned(),
             WHDTooltipPos::Top,
         )
         .clicked()
-        {}
+        {
+            self.whd.teleport_to_chunk_window = true;
+        }
     }
 }
 
@@ -444,7 +510,12 @@ impl State {
                 drawing_direction: WHDCIDrawingDirection::ToRight,
                 custom_image_path: "".to_owned(),
                 printed_room_id: false,
+                lock_painting: false,
                 previous_chunk_data_timestamp: None,
+
+                teleport_to_chunk_window: false,
+                tp_x_textfield: TextField::new(None),
+                tp_y_textfield: TextField::new(None),
             },
         };
         if this.peer.is_host() {
@@ -491,7 +562,7 @@ impl State {
         });
     }
 
-    fn process_canvas(&mut self, canvas: &mut Canvas, input: &Input) {
+    fn process_canvas(&mut self, canvas: &mut Canvas, input: &mut Input) {
         self.whd_process_canvas_start(canvas, input);
 
         self.ui
@@ -522,29 +593,31 @@ impl State {
         let brush_size = self.brush_size_slider.value();
         let from = input.previous_mouse_position() + self.viewport.pan();
         let to = input.mouse_position() + self.viewport.pan();
-        loop {
-            // give me back my labelled blocks
-            let brush = match self.paint_mode {
-                PaintMode::None => break,
-                PaintMode::WHDCustomImage => break,
-                PaintMode::Paint => Brush::Draw {
-                    color: self.paint_color.clone(),
-                    stroke_width: brush_size,
-                },
-                PaintMode::Erase => Brush::Erase {
-                    stroke_width: brush_size,
-                },
-            };
-            self.paint_canvas.stroke(from, to, &brush);
-            if self.stroke_buffer.is_empty() {
-                self.stroke_buffer.push(StrokePoint {
-                    point: from,
-                    brush: brush.clone(),
-                });
-            } else if to != self.stroke_buffer.last().unwrap().point {
-                self.stroke_buffer.push(StrokePoint { point: to, brush });
+        if !self.whd.lock_painting {
+            loop {
+                // give me back my labelled blocks
+                let brush = match self.paint_mode {
+                    PaintMode::None => break,
+                    PaintMode::WHDCustomImage => break,
+                    PaintMode::Paint => Brush::Draw {
+                        color: self.paint_color.clone(),
+                        stroke_width: brush_size,
+                    },
+                    PaintMode::Erase => Brush::Erase {
+                        stroke_width: brush_size,
+                    },
+                };
+                self.paint_canvas.stroke(from, to, &brush);
+                if self.stroke_buffer.is_empty() {
+                    self.stroke_buffer.push(StrokePoint {
+                        point: from,
+                        brush: brush.clone(),
+                    });
+                } else if to != self.stroke_buffer.last().unwrap().point {
+                    self.stroke_buffer.push(StrokePoint { point: to, brush });
+                }
+                break;
             }
-            break;
         }
 
         // panning

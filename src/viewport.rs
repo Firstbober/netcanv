@@ -27,6 +27,10 @@ impl Viewport {
         self.pan.offset(by);
     }
 
+    pub fn whd_set_pan(&mut self, pan: Vector) {
+        self.pan = pan;
+    }
+
     pub fn visible_rect(&self, window_size: (f32, f32)) -> Rect {
         Rect {
             left: self.pan.x,

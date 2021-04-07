@@ -1,4 +1,4 @@
-use crate::ui;
+use crate::ui::{self, ButtonProcessResult};
 
 use skulpin::skia_safe as skia;
 
@@ -35,17 +35,17 @@ pub trait WHDPaintFunctions {
     fn whd_process_canvas_end(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
     fn whd_process_canvas_custom_image(&mut self, input: &ui::Input);
 
-    fn whd_process_overlay(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
+    fn whd_process_overlay(&mut self, canvas: &mut skia::Canvas, input: &mut ui::Input);
     fn whd_overlay_window_begin(
         &mut self,
         canvas: &mut skia::Canvas,
-        input: &ui::Input,
+        input: &mut ui::Input,
         size: (f32, f32),
         margin: f32,
         title: &str,
         pos: OverlayWindowPos,
-    );
-    fn whd_overlay_window_end(&mut self);
+    ) -> bool;
+    fn whd_overlay_window_end(&mut self, input: &mut ui::Input);
 
     fn whd_bar_end_buttons(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
 }
