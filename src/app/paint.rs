@@ -222,7 +222,15 @@ impl wallhackd::WHDPaintFunctions for State {
         self.ui.pop_group();
     }
 
-    fn whd_overlay_window(&mut self, canvas: &mut Canvas, input: &Input, size: (f32, f32), margin: f32, title: &str, pos: wallhackd::OverlayWindowPos) {
+    fn whd_overlay_window(
+        &mut self,
+        canvas: &mut Canvas,
+        input: &Input,
+        size: (f32, f32),
+        margin: f32,
+        title: &str,
+        pos: wallhackd::OverlayWindowPos,
+    ) {
         let g_height = size.1 + 32.0;
 
         self.ui.push_group((self.ui.width(), g_height), Layout::HorizontalRev);
@@ -235,12 +243,8 @@ impl wallhackd::WHDPaintFunctions for State {
         self.ui.push_group((size.0, 32.0), Layout::HorizontalRev);
         self.ui.fill(canvas, Color::BLACK);
 
-        self.ui.text(
-            canvas,
-            title,
-            self.assets.colors.text,
-            (AlignH::Center, AlignV::Middle),
-        );
+        self.ui
+            .text(canvas, title, self.assets.colors.text, (AlignH::Center, AlignV::Middle));
         if Button::with_icon_and_tooltip(
             &mut self.ui,
             canvas,
@@ -424,7 +428,6 @@ impl State {
     }
 
     fn canvas_data(log: &mut Log, canvas: &mut PaintCanvas, chunk_position: (i32, i32), png_image: &[u8]) {
-        println!("received canvas data for chunk {:?}", chunk_position);
         ok_or_log!(log, canvas.decode_png_data(chunk_position, png_image));
     }
 
@@ -608,8 +611,8 @@ impl State {
                 }
             } else {
                 for chunk_position in self.viewport.visible_tiles(Chunk::SIZE, canvas_size) {
-                    if self.server_side_chunks.contains(&chunk_position) &&
-                        !self.requested_chunks.contains(&chunk_position)
+                    if self.server_side_chunks.contains(&chunk_position)
+                        && !self.requested_chunks.contains(&chunk_position)
                     {
                         self.needed_chunks.insert(chunk_position);
                     }
@@ -722,7 +725,6 @@ impl State {
                 Ok(Some(path)) => {
                     self.paint_canvas.cleanup_empty_chunks();
                     self.save_to_file = Some(path);
-                    //                     ok_or_log!(self.log, self.paint_canvas.save(&path))
                 }
                 Err(error) => log!(self.log, "Error while selecting file: {}", error),
                 _ => (),
@@ -792,14 +794,17 @@ impl AppState for State {
                         Message::Left(nickname) => log!(self.log, "{} left the room", nickname),
                         Message::Stroke(points) => Self::fellow_stroke(&mut self.paint_canvas, &points),
                         Message::ChunkPositions(mut positions) => {
-                            self.server_side_chunks = positions.drain(..).collect()
+                            eprintln!("received {} chunk positions", positions.len());
+                            self.server_side_chunks = positions.drain(..).collect();
                         }
-                        Message::Chunks(chunks) =>
+                        Message::Chunks(chunks) => {
+                            eprintln!("received {} chunks", chunks.len());
                             for (chunk_position, png_data) in chunks {
                                 self.whd.previous_chunk_data_timestamp = Some(SystemTime::now());
                                 Self::canvas_data(&mut self.log, &mut self.paint_canvas, chunk_position, &png_data);
                                 self.downloaded_chunks.insert(chunk_position);
-                            },
+                            }
+                        }
                         message => self.deferred_message_queue.push_back(message),
                     }
                 }
@@ -819,16 +824,21 @@ impl AppState for State {
                     }
                 }
                 Message::GetChunks(addr, positions) => {
+                    eprintln!("got request from {} for {} chunks", addr, positions.len());
                     let paint_canvas = &mut self.paint_canvas;
-                    let chunks: Vec<((i32, i32), Vec<u8>)> = positions
-                        .iter()
-                        .filter_map(|position| {
-                            paint_canvas
-                                .png_data(*position)
-                                .map(|slice| (*position, Vec::from(slice)))
-                        })
-                        .collect();
-                    ok_or_log!(self.log, self.peer.send_chunks(addr, chunks));
+                    for (i, chunks) in positions.chunks(32).enumerate() {
+                        eprintln!("  sending packet #{} containing {} chunks", i, chunks.len());
+                        let packet: Vec<((i32, i32), Vec<u8>)> = chunks
+                            .iter()
+                            .filter_map(|position| {
+                                paint_canvas
+                                    .png_data(*position)
+                                    .map(|slice| (*position, Vec::from(slice)))
+                            })
+                            .collect();
+                        ok_or_log!(self.log, self.peer.send_chunks(addr, packet));
+                    }
+                    eprintln!("  all packets sent");
                 }
                 _ => unreachable!("unhandled peer message type"),
             }
