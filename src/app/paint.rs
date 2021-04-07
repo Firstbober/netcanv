@@ -52,6 +52,11 @@ pub struct WHDState {
     teleport_to_chunk_window: bool,
     tp_x_textfield: TextField,
     tp_y_textfield: TextField,
+
+    select_rgb_color_window: bool,
+    select_rgb_color_field_r: TextField,
+    select_rgb_color_field_g: TextField,
+    select_rgb_color_field_b: TextField,
 }
 
 pub struct State {
@@ -243,15 +248,13 @@ impl wallhackd::WHDPaintFunctions for State {
             if self.whd_overlay_window_begin(
                 canvas,
                 input,
-                (160.0 + 12.0, 125.0),
+                (160.0, 113.0),
                 0.0,
                 "Teleport to chunk",
                 wallhackd::OverlayWindowPos::BottomRight,
             ) {
                 self.whd.teleport_to_chunk_window = false;
             }
-
-            self.ui.pad((12.0, 12.0));
 
             let mut textfield_arg = TextFieldArgs {
                 width: 160.0,
@@ -295,6 +298,91 @@ impl wallhackd::WHDPaintFunctions for State {
             self.whd_overlay_window_end(input);
         }
 
+        if self.whd.select_rgb_color_window {
+            if self.whd_overlay_window_begin(
+                canvas,
+                input,
+                ((48.0 + 56.0 + 8.0) + 60.0, (32.0 + 6.0) * 4.0),
+                0.0,
+                "Select RGB Color",
+                wallhackd::OverlayWindowPos::BottomLeft,
+            ) {
+                self.whd.select_rgb_color_window = false;
+            }
+
+            self.ui.push_group(
+                (self.ui.remaining_width(), self.ui.remaining_height()),
+                Layout::Horizontal,
+            );
+            {
+                // Color preview
+                self.ui.push_group((56.0, self.ui.remaining_height()), Layout::Freeform);
+                {
+                    self.ui.fill(canvas, Color::GREEN.with_a(128));
+                }
+                self.ui.pop_group();
+
+                self.ui.space(8.0);
+
+                // Textfields
+                self.ui.push_group(self.ui.remaining_size(), Layout::Vertical);
+                {
+                    let mut textfield_arg = TextFieldArgs {
+                        width: 96.0,
+                        colors: &self.assets.colors.text_field,
+                        hint: Some("R"),
+                    };
+
+                    let mut clr = Color::BLACK;
+
+
+                    if self
+                        .whd
+                        .select_rgb_color_field_r
+                        .process(&mut self.ui, canvas, input, textfield_arg)
+                        .changed()
+                    {
+                        println!("R color changed");
+                    }
+
+                    self.ui.space(6.0);
+
+                    textfield_arg.hint = Some("G");
+                    self.whd
+                        .select_rgb_color_field_g
+                        .process(&mut self.ui, canvas, input, textfield_arg);
+
+                    self.ui.space(6.0);
+
+                    textfield_arg.hint = Some("B");
+                    self.whd
+                        .select_rgb_color_field_b
+                        .process(&mut self.ui, canvas, input, textfield_arg);
+
+                    self.ui.space(6.0);
+
+                    // Buttons
+
+                    if Button::with_text(
+                        &mut self.ui,
+                        canvas,
+                        input,
+                        ButtonArgs {
+                            height: 32.0,
+                            colors: &self.assets.colors.button,
+                        },
+                        "Apply",
+                    )
+                    .clicked()
+                    {}
+                }
+                self.ui.pop_group();
+            }
+            self.ui.pop_group();
+
+            self.whd_overlay_window_end(input);
+        }
+
         self.ui.pop_group();
     }
 
@@ -307,6 +395,10 @@ impl wallhackd::WHDPaintFunctions for State {
         title: &str,
         pos: wallhackd::OverlayWindowPos,
     ) -> bool {
+        let mut size = size;
+        size.0 += 12.0;
+        size.1 += 12.0;
+
         let g_height = size.1 + 32.0;
         let padding = (16.0, 16.0);
 
@@ -389,6 +481,8 @@ impl wallhackd::WHDPaintFunctions for State {
         self.ui.pop_group();
         self.ui.push_group(size, Layout::Vertical);
 
+        self.ui.pad((12.0, 12.0));
+
         res
     }
 
@@ -412,7 +506,9 @@ impl wallhackd::WHDPaintFunctions for State {
             WHDTooltipPos::Top,
         )
         .clicked()
-        {}
+        {
+            self.whd.select_rgb_color_window = true;
+        }
     }
     fn whd_bar_end_buttons(&mut self, canvas: &mut Canvas, input: &Input) {
         if Button::with_icon_and_tooltip(
@@ -567,6 +663,11 @@ impl State {
                 teleport_to_chunk_window: false,
                 tp_x_textfield: TextField::new(None),
                 tp_y_textfield: TextField::new(None),
+
+                select_rgb_color_window: false,
+                select_rgb_color_field_r: TextField::new(Some("0")),
+                select_rgb_color_field_g: TextField::new(Some("0")),
+                select_rgb_color_field_b: TextField::new(Some("0")),
             },
         };
         if this.peer.is_host() {

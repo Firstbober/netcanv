@@ -28,6 +28,20 @@ pub struct TextFieldArgs<'a, 'b> {
     pub hint: Option<&'b str>,
 }
 
+pub enum WHDTextFieldEvent {
+    ContentChanged,
+    None
+}
+
+impl WHDTextFieldEvent {
+    pub fn changed(&self) -> bool {
+        match self {
+            &WHDTextFieldEvent::ContentChanged => true,
+            &WHDTextFieldEvent::None => false
+        }
+    }
+}
+
 impl TextField {
     const BACKSPACE: char = '\x08';
     const BLINK_PERIOD: f32 = 1.0;
@@ -58,7 +72,7 @@ impl TextField {
         canvas: &mut Canvas,
         input: &Input,
         TextFieldArgs { width, colors, hint }: TextFieldArgs,
-    ) {
+    ) -> WHDTextFieldEvent {
         ui.push_group((width, Self::height(ui)), Layout::Freeform);
 
         // rendering: box
@@ -105,9 +119,11 @@ impl TextField {
         ui.pop_group();
 
         // process events
-        self.process_events(ui, input);
+        let evs = self.process_events(ui, input);
 
         ui.pop_group();
+
+        evs
     }
 
     fn reset_blink(&mut self, input: &Input) {
@@ -124,7 +140,9 @@ impl TextField {
         self.update_utf8();
     }
 
-    fn process_events(&mut self, ui: &Ui, input: &Input) {
+    fn process_events(&mut self, ui: &Ui, input: &Input) -> WHDTextFieldEvent {
+        let mut ev = WHDTextFieldEvent::None;
+
         if input.mouse_button_just_pressed(MouseButton::Left) {
             self.focused = ui.has_mouse(input);
             if self.focused {
@@ -136,13 +154,21 @@ impl TextField {
                 self.reset_blink(input);
             }
             for ch in input.characters_typed() {
-                match *ch {
-                    _ if !ch.is_control() => self.append(*ch),
-                    Self::BACKSPACE => self.backspace(),
-                    _ => (),
-                }
+                ev = match *ch {
+                    _ if !ch.is_control() => {
+                        self.append(*ch);
+                        WHDTextFieldEvent::ContentChanged
+                    }
+                    Self::BACKSPACE => {
+                        self.backspace();
+                        WHDTextFieldEvent::ContentChanged
+                    }
+                    _ => WHDTextFieldEvent::None,
+                };
             }
         }
+
+        ev
     }
 
     pub fn labelled_height(ui: &Ui) -> f32 {
