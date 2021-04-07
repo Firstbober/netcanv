@@ -8,7 +8,6 @@ use native_dialog::FileDialog;
 use skulpin::skia_safe::paint as skpaint;
 use skulpin::skia_safe::*;
 
-use crate::assets::*;
 use crate::net::{Message, Peer, Timer};
 use crate::paint_canvas::*;
 use crate::ui::*;
@@ -18,6 +17,7 @@ use crate::{
     app::*,
     wallhackd::{self, WHDPaintFunctions},
 };
+use crate::{assets::*, ui};
 
 use std::time::SystemTime;
 
@@ -214,15 +214,22 @@ impl wallhackd::WHDPaintFunctions for State {
     fn whd_process_overlay(&mut self, canvas: &mut Canvas, input: &Input) {
         self.ui
             .push_group((self.ui.width(), self.ui.height()), Layout::VerticalRev);
-
         self.ui.pad((32.0, 32.0));
 
-        //self.whd_overlay_window(canvas, input, (300.0, 200.0), 0.0, "Teleport to chunk", wallhackd::OverlayWindowPos::BottomRight);
+        self.whd_overlay_window_begin(
+            canvas,
+            input,
+            (300.0, 200.0),
+            0.0,
+            "Teleport to chunk",
+            wallhackd::OverlayWindowPos::Middle,
+        );
+        self.whd_overlay_window_end();
 
         self.ui.pop_group();
     }
 
-    fn whd_overlay_window(
+    fn whd_overlay_window_begin(
         &mut self,
         canvas: &mut Canvas,
         input: &Input,
@@ -233,7 +240,42 @@ impl wallhackd::WHDPaintFunctions for State {
     ) {
         let g_height = size.1 + 32.0;
 
-        self.ui.push_group((self.ui.width(), g_height), Layout::HorizontalRev);
+        let mut tg_height = g_height;
+        let mut tg_layout = Layout::HorizontalRev;
+
+        match pos {
+            wallhackd::OverlayWindowPos::Top => {
+                tg_height = self.ui.remaining_height();
+                self.ui.pad((self.ui.remaining_width() - size.0, 0.0));
+            }
+            wallhackd::OverlayWindowPos::TopLeft => {
+                tg_height = self.ui.remaining_height();
+                tg_layout = Layout::Horizontal
+            }
+            wallhackd::OverlayWindowPos::TopRight => {
+                tg_height = self.ui.remaining_height();
+            }
+
+            wallhackd::OverlayWindowPos::Middle => {
+                tg_height = (self.ui.height() / 2.0) + (g_height / 2.0);
+                self.ui.pad((self.ui.remaining_width() - size.0, 0.0));
+            }
+            wallhackd::OverlayWindowPos::MiddleLeft => {
+                tg_height = (self.ui.height() / 2.0) + (g_height / 2.0);
+                tg_layout = Layout::Horizontal
+            }
+            wallhackd::OverlayWindowPos::MiddleRight => {
+                tg_height = (self.ui.height() / 2.0) + (g_height / 2.0);
+            }
+
+            wallhackd::OverlayWindowPos::Bottom => {
+                self.ui.pad((self.ui.remaining_width() - size.0, 0.0));
+            }
+            wallhackd::OverlayWindowPos::BottomLeft => tg_layout = Layout::Horizontal,
+            wallhackd::OverlayWindowPos::BottomRight => {}
+        }
+
+        self.ui.push_group((self.ui.width(), tg_height), tg_layout);
 
         self.ui.pad((margin, 0.0));
 
@@ -261,9 +303,13 @@ impl wallhackd::WHDPaintFunctions for State {
         {}
 
         self.ui.pop_group();
-
         self.ui.pop_group();
 
+        self.ui.push_group(size, Layout::Vertical);
+    }
+
+    fn whd_overlay_window_end(&mut self) {
+        self.ui.pop_group();
         self.ui.pop_group();
     }
 
@@ -549,7 +595,7 @@ impl State {
             let position = format!("{}, {}", (pan.x / 256.0).floor(), (pan.y / 256.0).floor());
             self.ui.push_group(self.ui.size(), Layout::Freeform);
             self.ui.pad((32.0, 32.0));
-            self.ui.push_group((72.0, 46.0), Layout::Vertical);
+            self.ui.push_group((72.0, 62.0), Layout::Vertical);
             self.ui.fill(canvas, Color::BLACK.with_a(128));
             self.ui.pad((0.0, 8.0));
 
@@ -570,6 +616,17 @@ impl State {
                 Color::WHITE.with_a(128),
                 (AlignH::Center, AlignV::Middle),
             );
+
+            self.ui.pop_group();
+
+            self.ui.push_group((self.ui.width(), 16.0), Layout::Vertical);
+            self.ui.text(
+                canvas,
+                &format!("T: {}", self.server_side_chunks.len()),
+                Color::WHITE.with_a(128),
+                (AlignH::Center, AlignV::Middle),
+            );
+
             self.ui.pop_group();
 
             self.ui.set_font_size(last_fs);
