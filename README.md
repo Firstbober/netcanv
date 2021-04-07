@@ -10,6 +10,7 @@
 - Filling out username, roomid and matchmaker address using cli
 - Username length raised to 24 characters
 - Shows number of loaded chunks
+- Teleport around using handy inputs
 
 # NetCanv
 
