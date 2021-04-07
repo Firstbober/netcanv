@@ -3,8 +3,9 @@
 
 use std::collections::HashMap;
 use std::error;
-use std::io::Write;
+use std::io::{BufReader, BufWriter, Write};
 use std::net::{AddrParseError, SocketAddr, TcpListener, TcpStream};
+use std::ops::Deref;
 use std::sync::{Arc, Mutex, Weak};
 
 use netcanv_protocol::matchmaker::*;
@@ -13,10 +14,35 @@ use thiserror::Error;
 
 const MAX_ROOM_ID: u32 = 9999;
 
-#[derive(Clone, Debug)]
+struct BufStream {
+    stream: TcpStream,
+    writer: Mutex<BufWriter<TcpStream>>,
+    reader: Mutex<BufReader<TcpStream>>,
+}
+
+impl BufStream {
+    fn new(stream: TcpStream) -> Result<Self, Error> {
+        const MEGABYTE: usize = 1024 * 1024;
+        Ok(Self {
+            writer: Mutex::new(BufWriter::with_capacity(2 * MEGABYTE, stream.try_clone()?)),
+            reader: Mutex::new(BufReader::with_capacity(2 * MEGABYTE, stream.try_clone()?)),
+            stream,
+        })
+    }
+}
+
+impl Deref for BufStream {
+    type Target = TcpStream;
+
+    fn deref(&self) -> &Self::Target {
+        &self.stream
+    }
+}
+
+#[derive(Clone)]
 struct Room {
-    host: Arc<TcpStream>,
-    clients: Vec<Weak<TcpStream>>,
+    host: Arc<BufStream>,
+    clients: Vec<Weak<BufStream>>,
     id: u32,
 }
 
@@ -61,24 +87,22 @@ impl Matchmaker {
         None
     }
 
-    fn whd_check_if_id_is_free(&self, room_id: u32) -> bool {
-        return !self.rooms.contains_key(&room_id);
-    }
-
-    fn send_packet(stream: &TcpStream, packet: &Packet) -> Result<(), Error> {
+    fn send_packet(stream: &BufStream, packet: &Packet) -> Result<(), Error> {
         match &packet {
             Packet::Relayed(..) => (),
             packet => eprintln!("- sending packet {} -> {:?}", stream.peer_addr()?, packet),
         }
-        bincode::serialize_into(stream, packet)?;
+        let mut writer = stream.writer.lock().unwrap();
+        bincode::serialize_into(&mut *writer, packet)?;
+        writer.flush()?;
         Ok(())
     }
 
-    fn send_error(stream: &TcpStream, error: &str) -> Result<(), Error> {
+    fn send_error(stream: &BufStream, error: &str) -> Result<(), Error> {
         Self::send_packet(stream, &error_packet(error))
     }
 
-    fn host(mm: Arc<Mutex<Self>>, peer_addr: SocketAddr, stream: Arc<TcpStream>) -> Result<(), Error> {
+    fn host(mm: Arc<Mutex<Self>>, peer_addr: SocketAddr, stream: Arc<BufStream>) -> Result<(), Error> {
         let mut mm = mm.lock().unwrap();
         match mm.find_free_room_id() {
             Some(room_id) => {
@@ -99,30 +123,7 @@ impl Matchmaker {
         Ok(())
     }
 
-    fn whd_host_with_custom_id(mm: Arc<Mutex<Self>>, peer_addr: SocketAddr, stream: Arc<TcpStream>, room_id: u32) -> Result<(), Error> {
-        let mut mm = mm.lock().unwrap();
-
-        if mm.whd_check_if_id_is_free(room_id) {
-            let room = Room {
-                host: stream.clone(),
-                clients: Vec::new(),
-                id: room_id,
-            };
-
-            {
-                mm.rooms.insert(room_id, Arc::new(Mutex::new(room)));
-                mm.host_rooms.insert(peer_addr, room_id);
-            }
-            drop(mm);
-            Self::send_packet(&stream, &Packet::RoomId(room_id))?;
-        } else {
-            Self::send_error(&stream, "[WallhackD](MM)<CustomRoomID> Wanted ID is in use")?
-        }
-
-        Ok(())
-    }
-
-    fn join(mm: Arc<Mutex<Self>>, stream: &TcpStream, room_id: u32) -> Result<(), Error> {
+    fn join(mm: Arc<Mutex<Self>>, stream: &BufStream, room_id: u32) -> Result<(), Error> {
         let mm = mm.lock().unwrap();
         let room = match mm.rooms.get(&room_id) {
             Some(room) => room,
@@ -142,7 +143,7 @@ impl Matchmaker {
         Self::send_packet(stream, &Packet::HostAddress(host_addr))
     }
 
-    fn add_relay(mm: Arc<Mutex<Self>>, stream: Arc<TcpStream>, host_addr: Option<SocketAddr>) -> Result<(), Error> {
+    fn add_relay(mm: Arc<Mutex<Self>>, stream: Arc<BufStream>, host_addr: Option<SocketAddr>) -> Result<(), Error> {
         let peer_addr = stream.peer_addr().unwrap();
         eprintln!("- relay requested from {}", peer_addr);
 
@@ -171,7 +172,7 @@ impl Matchmaker {
     fn relay(
         mm: Arc<Mutex<Self>>,
         addr: SocketAddr,
-        stream: &Arc<TcpStream>,
+        stream: &Arc<BufStream>,
         to: Option<SocketAddr>,
         data: Vec<u8>, // Vec because it's moved out of the Relay packet
     ) -> Result<(), Error> {
@@ -217,7 +218,7 @@ impl Matchmaker {
     fn incoming_packet(
         mm: Arc<Mutex<Self>>,
         peer_addr: SocketAddr,
-        stream: Arc<TcpStream>,
+        stream: Arc<BufStream>,
         packet: Packet,
     ) -> Result<(), Error> {
         match &packet {
@@ -259,7 +260,7 @@ impl Matchmaker {
 
     fn start_client_thread(mm: Arc<Mutex<Self>>, stream: TcpStream) -> Result<(), Error> {
         let peer_addr = stream.peer_addr()?;
-        let stream = Arc::new(stream);
+        let stream = Arc::new(BufStream::new(stream)?);
         eprintln!("* mornin' mr. {}", peer_addr);
         let _ = std::thread::spawn(move || {
             loop {
@@ -277,7 +278,7 @@ impl Matchmaker {
                         break
                     }
                 }
-                let _ = bincode::deserialize_from(&*stream) // what
+                let _ = bincode::deserialize_from(&mut *stream.reader.lock().unwrap()) // what
                     .map_err(|_| Error::Deserialize)
                     .and_then(|decoded| Self::incoming_packet(mm.clone(), peer_addr, stream.clone(), decoded))
                     .or_else(|error| -> Result<_, ()> {
@@ -287,6 +288,33 @@ impl Matchmaker {
             }
             eprintln!("* bye bye mr. {} it was nice to see ya", peer_addr);
         });
+        Ok(())
+    }
+
+    fn whd_check_if_id_is_free(&self, room_id: u32) -> bool {
+        return !self.rooms.contains_key(&room_id);
+    }
+
+    fn whd_host_with_custom_id(mm: Arc<Mutex<Self>>, peer_addr: SocketAddr, stream: Arc<BufStream>, room_id: u32) -> Result<(), Error> {
+        let mut mm = mm.lock().unwrap();
+
+        if mm.whd_check_if_id_is_free(room_id) {
+            let room = Room {
+                host: stream.clone(),
+                clients: Vec::new(),
+                id: room_id,
+            };
+
+            {
+                mm.rooms.insert(room_id, Arc::new(Mutex::new(room)));
+                mm.host_rooms.insert(peer_addr, room_id);
+            }
+            drop(mm);
+            Self::send_packet(&stream, &Packet::RoomId(room_id))?;
+        } else {
+            Self::send_error(&stream, "[WallhackD](MM)<CustomRoomID> Wanted ID is in use")?
+        }
+
         Ok(())
     }
 }
