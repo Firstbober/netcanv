@@ -40,8 +40,10 @@ pub enum WHDCIDrawingDirection {
 }
 
 pub struct WHDState {
-    custom_image_path: String,
+    custom_image: Option<image::DynamicImage>,
     drawing_direction: WHDCIDrawingDirection,
+    custom_image_dims: Option<(u32, u32)>,
+
     printed_room_id: bool,
     lock_painting: bool,
 
@@ -127,15 +129,33 @@ impl wallhackd::WHDPaintFunctions for State {
     fn whd_process_canvas_custom_image(&mut self, input: &Input) {
         log!(self.log, "[WallhackD] [Custom Image] Started!");
 
-        // get image from file
+        if self.whd.custom_image.is_none() && self.whd.custom_image_dims.is_none() {
+            log!(self.log, "[WallhackD] [Custom Image] Failed!");
+            return;
+        }
 
-        let mut trollage = image::open(self.whd.custom_image_path.as_str()).unwrap();
+        // get offset for chunks
+
+        let x_off = ((input.mouse_position().x + self.viewport.pan().x) / 256.0) as i32;
+        let y_off = ((input.mouse_position().y + self.viewport.pan().y) / 256.0) as i32;
+
+        let ch_x_off = ((input.mouse_position().x + self.viewport.pan().x) as i32 - (x_off * 256)).abs() as u32;
+        let ch_y_off = ((input.mouse_position().y + self.viewport.pan().y) as i32 - (y_off * 256)).abs() as u32;
+
+        // get image
+
+        let mut trollage = image::DynamicImage::new_rgba8(
+            self.whd.custom_image_dims.unwrap().0 + ch_x_off,
+            self.whd.custom_image_dims.unwrap().1 + ch_y_off,
+        );
         let dm = trollage.dimensions();
+        trollage
+            .copy_from(&self.whd.custom_image.clone().unwrap(), ch_x_off, ch_y_off)
+            .unwrap();
 
         // calculate parts
 
         let width_parts = if dm.0 % 256 != 0 { (dm.0 / 256) + 1 } else { dm.0 / 256 };
-
         let height_parts = if dm.1 % 256 != 0 { (dm.1 / 256) + 1 } else { dm.1 / 256 };
 
         log!(
@@ -144,10 +164,7 @@ impl wallhackd::WHDPaintFunctions for State {
             width_parts * height_parts
         );
 
-        // get offset for chunks
-
-        let x_off = ((input.mouse_position().x + self.viewport.pan().x) / 256.0) as i32;
-        let y_off = ((input.mouse_position().y + self.viewport.pan().y) / 256.0) as i32;
+        // process everything
 
         log!(
             self.log,
@@ -156,42 +173,19 @@ impl wallhackd::WHDPaintFunctions for State {
             y_off
         );
 
-        // process everything
-
-        // TODO: Align to mouse position not to chunk
-        // TODO: Remove chunk override
-
-        let mut image_to_insert: image::RgbaImage = Default::default();
+        let mut new_to_insert = trollage.view(0, 0, 0, 0);
+        let mut chunks_to_send: Vec<((i32, i32), Vec<u8>)> = Default::default();
 
         for x in 0..width_parts {
             for y in 0..height_parts {
                 if y == height_parts - 1 && x == width_parts - 1 {
-                    let part = SubImage::new(trollage.borrow_mut(), x * 256, y * 256, dm.0 - x * 256, dm.1 - y * 256);
-                    image_to_insert = image::ImageBuffer::new(256, 256);
-                    image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
+                    new_to_insert = trollage.view(x * 256, y * 256, dm.0 - x * 256, dm.1 - y * 256);
                 } else if y == height_parts - 1 {
-                    let part = SubImage::new(trollage.borrow_mut(), x * 256, y * 256, 256, dm.1 - y * 256);
-                    image_to_insert = image::ImageBuffer::new(256, 256);
-                    image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
+                    new_to_insert = trollage.view(x * 256, y * 256, 256, dm.1 - y * 256);
                 } else if x == width_parts - 1 {
-                    let part = SubImage::new(trollage.borrow_mut(), x * 256, y * 256, dm.0 - x * 256, 256);
-                    image_to_insert = image::ImageBuffer::new(256, 256);
-                    image_to_insert.copy_from(&part.to_image(), 0, 0).unwrap();
+                    new_to_insert = trollage.view(x * 256, y * 256, dm.0 - x * 256, 256);
                 } else {
-                    let part = SubImage::new(trollage.borrow_mut(), x * 256, y * 256, 256, 256);
-                    image_to_insert = part.to_image();
-                }
-
-                // change to bgra
-
-                for px in image_to_insert.pixels_mut() {
-                    let bgra = px.to_bgra();
-                    let channels = px.channels_mut();
-
-                    channels[0] = bgra[0];
-                    channels[1] = bgra[1];
-                    channels[2] = bgra[2];
-                    channels[3] = bgra[3];
+                    new_to_insert = trollage.view(x * 256, y * 256, 256, 256);
                 }
 
                 let pos = match self.whd.drawing_direction {
@@ -201,22 +195,44 @@ impl wallhackd::WHDPaintFunctions for State {
                     WHDCIDrawingDirection::ToRight => (x as i32 + x_off as i32, y_off as i32 + y as i32),
                 };
 
+                println!("{}, {}", pos.0, pos.1);
+
                 self.paint_canvas.ensure_chunk_exists(pos);
                 let chk = self.paint_canvas.chunks.get_mut(&pos).unwrap();
-                let mut chunk_image = chk.as_image_buffer_mut();
 
-                let sb = image_to_insert.view(0, 0, 256, 256);
-                chunk_image.copy_from(&sb, 0, 0).unwrap();
+                let sfimg = new_to_insert.to_image();
 
-                for addr in self.peer.mates() {
-                    self.peer
-                        .send_canvas_data(*addr.0, pos, chk.png_data().unwrap().to_vec())
-                        .unwrap();
-                }
+                let img_info = ImageInfo::new(
+                    (sfimg.width() as i32, sfimg.height() as i32),
+                    ColorType::RGBA8888,
+                    AlphaType::Premul,
+                    ColorSpace::new_srgb(),
+                );
+
+                let data = sfimg.as_raw();
+                let stride = sfimg.width() as usize * 4;
+                let skimg = Image::from_raster_data(&img_info, Data::new_copy(data), stride);
+
+                match skimg {
+                    Some(img) => {
+                        chk.canvas.draw_image(img, (0, 0), None);
+                        chunks_to_send.push(((x as i32, y as i32), chk.png_data().unwrap().to_vec()));
+                    }
+                    None => log!(
+                        self.log,
+                        "[WallhackD] [Custom Image] !! Something broke and image can't be pasted"
+                    ),
+                };
             }
         }
 
+        for addr in self.peer.mates() {
+            self.peer.send_chunks(*addr.0, chunks_to_send.clone()).unwrap();
+        }
+
         log!(self.log, "[WallhackD] [Custom Image] Completed!");
+
+        self.whd.custom_image_dims = None;
     }
 
     fn whd_process_overlay(&mut self, canvas: &mut Canvas, input: &mut Input) {
@@ -271,7 +287,8 @@ impl wallhackd::WHDPaintFunctions for State {
                 let pr_y = self.whd.tp_y_textfield.text().to_string().parse::<f32>();
 
                 if !pr_x.is_err() || !pr_y.is_err() {
-                    self.viewport.whd_set_pan(Point::new(pr_x.unwrap() * 256.0, pr_y.unwrap()*256.0));
+                    self.viewport
+                        .whd_set_pan(Point::new(pr_x.unwrap() * 256.0, pr_y.unwrap() * 256.0));
                 }
             }
 
@@ -343,8 +360,12 @@ impl wallhackd::WHDPaintFunctions for State {
         self.ui.push_group((size.0, 32.0), Layout::HorizontalRev);
         self.ui.fill(canvas, Color::BLACK);
 
-        self.ui
-            .text(canvas, format!("   {}", title).as_str(), self.assets.colors.text, (AlignH::Left, AlignV::Middle));
+        self.ui.text(
+            canvas,
+            format!("   {}", title).as_str(),
+            self.assets.colors.text,
+            (AlignH::Left, AlignV::Middle),
+        );
 
         let mut res = false;
         if Button::with_icon_and_tooltip(
@@ -377,6 +398,22 @@ impl wallhackd::WHDPaintFunctions for State {
         self.ui.pop_group();
     }
 
+    fn whd_bar_after_palette_buttons(&mut self, canvas: &mut Canvas, input: &Input) {
+        if Button::with_icon_and_tooltip(
+            &mut self.ui,
+            canvas,
+            input,
+            ButtonArgs {
+                height: 32.0,
+                colors: &self.assets.colors.tool_button,
+            },
+            &self.assets.icons.whd.palette,
+            "(WIP) RGB Color".to_owned(),
+            WHDTooltipPos::Top,
+        )
+        .clicked()
+        {}
+    }
     fn whd_bar_end_buttons(&mut self, canvas: &mut Canvas, input: &Input) {
         if Button::with_icon_and_tooltip(
             &mut self.ui,
@@ -392,7 +429,10 @@ impl wallhackd::WHDPaintFunctions for State {
         )
         .clicked()
         {
-            self.paint_mode = PaintMode::WHDCustomImage;
+            if self.whd.custom_image.is_some() {
+                self.paint_mode = PaintMode::WHDCustomImage;
+                self.whd.custom_image_dims = Some(self.whd.custom_image.clone().unwrap().dimensions());
+            }
         }
 
         if Button::with_icon_and_tooltip(
@@ -420,7 +460,14 @@ impl wallhackd::WHDPaintFunctions for State {
                     log!(self.log, "[WallhackD] [Custom Image] Got image path");
 
                     self.paint_mode = PaintMode::WHDCustomImage;
-                    self.whd.custom_image_path = String::from_str(path.to_str().unwrap()).unwrap();
+
+                    match image::open(path) {
+                        Ok(img) => {
+                            self.whd.custom_image = Some(img.clone());
+                            self.whd.custom_image_dims = Some(img.dimensions());
+                        }
+                        Err(err) => log!(self.log, "[WallhackD] Got some error when loading image {}", err),
+                    };
                 }
                 None => log!(self.log, "[WallhackD] U selected nothing"),
             };
@@ -452,7 +499,9 @@ impl wallhackd::WHDPaintFunctions for State {
             self.whd.drawing_direction = match self.whd.drawing_direction {
                 WHDCIDrawingDirection::ToLeft => WHDCIDrawingDirection::ToRight,
                 WHDCIDrawingDirection::ToRight => WHDCIDrawingDirection::ToLeft,
-            }
+            };
+
+            self.paint_mode = PaintMode::WHDCustomImage;
         }
 
         if Button::with_icon_and_tooltip(
@@ -469,7 +518,7 @@ impl wallhackd::WHDPaintFunctions for State {
         )
         .clicked()
         {
-            self.whd.teleport_to_chunk_window = true;
+            self.whd.teleport_to_chunk_window = !self.whd.teleport_to_chunk_window;
         }
     }
 }
@@ -508,7 +557,9 @@ impl State {
 
             whd: WHDState {
                 drawing_direction: WHDCIDrawingDirection::ToRight,
-                custom_image_path: "".to_owned(),
+                custom_image: None,
+                custom_image_dims: None,
+
                 printed_room_id: false,
                 lock_painting: false,
                 previous_chunk_data_timestamp: None,
@@ -662,6 +713,36 @@ impl State {
             let mouse = self.ui.mouse_position(&input);
             paint.set_style(skpaint::Style::Stroke);
             canvas.draw_circle(mouse, self.brush_size_slider.value() * 0.5, &paint);
+
+            if self.whd.custom_image_dims.is_some() {
+                let dims = self.whd.custom_image_dims.unwrap();
+                let x_off = match self.whd.drawing_direction {
+                    WHDCIDrawingDirection::ToLeft => dims.0 as f32,
+                    WHDCIDrawingDirection::ToRight => 0.0,
+                };
+
+                match self.whd.drawing_direction {
+                    WHDCIDrawingDirection::ToLeft => {
+                        let x_off2 = ((input.mouse_position().x + self.viewport.pan().x) / 256.0) as i32;
+                        let ch_x_off =
+                            ((input.mouse_position().x + self.viewport.pan().x) as i32 - (x_off2 * 256)).abs() as u32;
+
+                        canvas.draw_rect(
+                            Rect::from_point_and_size(
+                                ((mouse.x - x_off) - ch_x_off as f32 - 32.0, mouse.y),
+                                ((dims.0 + ch_x_off) as i32 + 32, dims.1 as i32),
+                            ),
+                            &paint,
+                        );
+                    }
+                    WHDCIDrawingDirection::ToRight => {
+                        canvas.draw_rect(
+                            Rect::from_point_and_size((mouse.x - x_off as f32, mouse.y), (dims.0 as i32, dims.1 as i32)),
+                            &paint,
+                        );
+                    }
+                };
+            }
         });
         if self.panning {
             let pan = self.viewport.pan();
@@ -787,6 +868,8 @@ impl State {
             self.ui.pop_group();
         }
         self.ui.space(16.0);
+
+        self.whd_bar_after_palette_buttons(canvas, input);
 
         // brush size
 

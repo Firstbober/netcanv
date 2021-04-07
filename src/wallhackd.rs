@@ -47,6 +47,7 @@ pub trait WHDPaintFunctions {
     ) -> bool;
     fn whd_overlay_window_end(&mut self, input: &mut ui::Input);
 
+	fn whd_bar_after_palette_buttons(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
     fn whd_bar_end_buttons(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
 }
 
