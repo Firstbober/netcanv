@@ -4,9 +4,9 @@ use skulpin::skia_safe::*;
 
 use crate::util::RcFont;
 
-pub mod input;
 mod button;
 mod expand;
+pub mod input;
 mod slider;
 mod textfield;
 
@@ -47,7 +47,7 @@ struct Group {
     layout_position: Point,
     font: Option<RcFont>,
     font_size: f32,
-    font_height_in_pixels: f32
+    font_height_in_pixels: f32,
 }
 
 pub struct Ui {
@@ -55,7 +55,6 @@ pub struct Ui {
 }
 
 impl Ui {
-
     pub fn new() -> Self {
         Self {
             group_stack: Vec::new(),
@@ -114,18 +113,16 @@ impl Ui {
             Layout::Freeform | Layout::Horizontal | Layout::Vertical =>
                 Point::new(top_rect.left, top_rect.top) + self.top().layout_position,
             Layout::HorizontalRev =>
-                Point::new(top_rect.right, top_rect.top) + self.top().layout_position
-                - Point::new(size.0, 0.0),
+                Point::new(top_rect.right, top_rect.top) + self.top().layout_position - Point::new(size.0, 0.0),
             Layout::VerticalRev =>
-                Point::new(top_rect.left, top_rect.bottom) + self.top().layout_position
-                - Point::new(0.0, size.1),
+                Point::new(top_rect.left, top_rect.bottom) + self.top().layout_position - Point::new(0.0, size.1),
         };
         let group = Group {
             rect: Rect::from_point_and_size(position, size),
             layout,
             layout_position: Point::new(0.0, 0.0),
             font: self.top().font.clone(),
-            .. *self.top()
+            ..*self.top()
         };
         self.group_stack.push(group);
     }
@@ -150,7 +147,10 @@ impl Ui {
     }
 
     pub fn align(&mut self, alignment: Alignment) {
-        assert!(self.group_stack.len() >= 2, "at least two groups (parent and child) must be present for alignment");
+        assert!(
+            self.group_stack.len() >= 2,
+            "at least two groups (parent and child) must be present for alignment"
+        );
 
         let mut iter = self.group_stack.iter_mut();
         let child = iter.next_back().unwrap();
@@ -240,22 +240,22 @@ impl Ui {
 
     fn borrow_font(&self) -> Ref<Font> {
         self.top()
-            .font.as_ref()
+            .font
+            .as_ref()
             .expect("a font must be provided first")
             .borrow()
     }
 
     fn borrow_font_mut(&self) -> RefMut<Font> {
         self.top()
-            .font.as_ref()
+            .font
+            .as_ref()
             .expect("a font must be provided first")
             .borrow_mut()
     }
 
     fn recalculate_font_metrics(&mut self) {
-        let font = self.borrow_font()
-            .with_size(self.top().font_size)
-            .unwrap();
+        let font = self.borrow_font().with_size(self.top().font_size).unwrap();
         let (_, metrics) = font.metrics();
         self.top_mut().font_height_in_pixels = metrics.cap_height.abs();
     }
@@ -320,16 +320,20 @@ impl Ui {
         canvas: &mut Canvas,
         icon: &Image,
         color: impl Into<Color4f>,
-        group_size: Option<(f32, f32)>
+        group_size: Option<(f32, f32)>,
     ) {
         let group_size = group_size.unwrap_or((icon.width() as f32, icon.height() as f32));
         self.push_group(group_size, Layout::Freeform);
 
-        // probably quite horrible but there aren't that many icons drawn to the screen at once in the first place
+        // probably quite horrible but there aren't that many icons drawn to the screen at once in the first
+        // place
         let image_bounds = IRect::new(0, 0, icon.width(), icon.height());
         let color_filter = color_filters::blend(color.into().to_color(), BlendMode::SrcATop).unwrap();
         let filter = image_filters::color_filter(color_filter, None, None).unwrap();
-        let colored_icon = icon.new_with_filter(None, &filter, image_bounds, image_bounds).unwrap().0;
+        let colored_icon = icon
+            .new_with_filter(None, &filter, image_bounds, image_bounds)
+            .unwrap()
+            .0;
 
         let x = self.top().rect.left + self.width() / 2.0 - icon.width() as f32 / 2.0;
         let y = self.top().rect.top + self.height() / 2.0 - icon.height() as f32 / 2.0;
@@ -375,7 +379,6 @@ impl Ui {
         let Size { width, height } = self.top().rect.size();
         mouse.x >= 0.0 && mouse.x <= width && mouse.y >= 0.0 && mouse.y <= height
     }
-
 }
 
 pub trait Focus {
@@ -401,4 +404,3 @@ pub fn chain_focus(input: &Input, fields: &mut [&mut dyn Focus]) {
         }
     }
 }
-

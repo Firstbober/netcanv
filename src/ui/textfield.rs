@@ -29,9 +29,10 @@ pub struct TextFieldArgs<'a, 'b> {
 }
 
 impl TextField {
-
+    const BACKSPACE: char = '\x08';
     const BLINK_PERIOD: f32 = 1.0;
     const HALF_BLINK: f32 = Self::BLINK_PERIOD / 2.0;
+    const TAB: char = '\x09';
 
     pub fn new(initial_text: Option<&str>) -> Self {
         let text_utf8: String = initial_text.unwrap_or("").into();
@@ -48,7 +49,7 @@ impl TextField {
     }
 
     pub fn height(ui: &Ui) -> f32 {
-        f32::round(16.0/7.0 * ui.font_size())
+        f32::round(16.0 / 7.0 * ui.font_size())
     }
 
     pub fn process(
@@ -66,7 +67,11 @@ impl TextField {
             paint.set_anti_alias(true);
             let mut rrect = RRect::new_rect_xy(&Rect::from_point_and_size((0.0, 0.0), ui.size()), 0.0, 0.0);
             canvas.draw_rrect(rrect, &paint);
-            paint.set_color(if self.focused { colors.outline_focus } else { colors.outline });
+            paint.set_color(if self.focused {
+                colors.outline_focus
+            } else {
+                colors.outline
+            });
             paint.set_style(paint::Style::Stroke);
             rrect.offset((0.5, 0.5));
             canvas.draw_rrect(rrect, &paint);
@@ -119,9 +124,6 @@ impl TextField {
         self.update_utf8();
     }
 
-    const BACKSPACE: char = '\x08';
-    const TAB: char = '\x09';
-
     fn process_events(&mut self, ui: &Ui, input: &Input) {
         if input.mouse_button_just_pressed(MouseButton::Left) {
             self.focused = ui.has_mouse(input);
@@ -147,14 +149,7 @@ impl TextField {
         16.0 + TextField::height(ui)
     }
 
-    pub fn with_label(
-        &mut self,
-        ui: &mut Ui,
-        canvas: &mut Canvas,
-        input: &Input,
-        label: &str,
-        args: TextFieldArgs,
-    ) {
+    pub fn with_label(&mut self, ui: &mut Ui, canvas: &mut Canvas, input: &Input, label: &str, args: TextFieldArgs) {
         ui.push_group((args.width, Self::labelled_height(ui)), Layout::Vertical);
 
         // label
@@ -171,7 +166,6 @@ impl TextField {
     pub fn text<'a>(&'a self) -> &'a str {
         &self.text_utf8
     }
-
 }
 
 impl Focus for TextField {

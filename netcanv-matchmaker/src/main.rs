@@ -1,14 +1,13 @@
 // the netcanv matchmaker server.
 // keeps track of open rooms and exchanges addresses between hosts and their clients
 
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::error;
 use std::net::{AddrParseError, SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, Weak};
 
-use thiserror::Error;
-
 use netcanv_protocol::matchmaker::*;
+use thiserror::Error;
 
 const MAX_ROOM_ID: u32 = 9999;
 
@@ -40,7 +39,6 @@ enum Error {
 }
 
 impl Matchmaker {
-
     fn new() -> Self {
         Self {
             rooms: HashMap::new(),
@@ -85,7 +83,7 @@ impl Matchmaker {
                 let room = Room {
                     host: stream.clone(),
                     clients: Vec::new(),
-                    id: room_id
+                    id: room_id,
                 };
                 {
                     mm.rooms.insert(room_id, room);
@@ -127,9 +125,11 @@ impl Matchmaker {
         let room = match mm.rooms.get(&room_id) {
             Some(room) => room,
             None => {
-                Self::send_error(stream,
-                    "No room found with the given ID. Check whether you spelled the ID correctly")?;
-                return Ok(());
+                Self::send_error(
+                    stream,
+                    "No room found with the given ID. Check whether you spelled the ID correctly",
+                )?;
+                return Ok(())
             },
         };
         let client_addr = stream.peer_addr()?;
@@ -150,11 +150,15 @@ impl Matchmaker {
                 Some(id) => room_id = *id,
                 None => {
                     Self::send_error(&stream, "The host seems to have disconnected")?;
-                    return Ok(());
+                    return Ok(())
                 },
             }
             mm.relay_clients.insert(peer_addr, room_id);
-            mm.rooms.get_mut(&room_id).unwrap().clients.push(Arc::downgrade(&stream));
+            mm.rooms
+                .get_mut(&room_id)
+                .unwrap()
+                .clients
+                .push(Arc::downgrade(&stream));
         }
 
         Ok(())
@@ -165,19 +169,18 @@ impl Matchmaker {
         addr: SocketAddr,
         stream: &Arc<TcpStream>,
         to: Option<SocketAddr>,
-        data: &[u8]
+        data: &[u8],
     ) -> Result<(), Error> {
         // XXX: this can bottleneck the server if there are many relays running at the same time
         // because the mutex is locked for the entire duration of the server relaying packets!!!
         let mut mm = mm.lock().unwrap();
-        let room_id =
-            match mm.relay_clients.get(&addr) {
-                Some(id) => *id,
-                None => {
-                    Self::send_error(stream, "Only relay clients may send Relay packets")?;
-                    return Ok(())
-                },
-            };
+        let room_id = match mm.relay_clients.get(&addr) {
+            Some(id) => *id,
+            None => {
+                Self::send_error(stream, "Only relay clients may send Relay packets")?;
+                return Ok(())
+            },
+        };
         match mm.rooms.get_mut(&room_id) {
             Some(room) => {
                 let mut nclients = 0;
@@ -187,7 +190,7 @@ impl Matchmaker {
                     if !Arc::ptr_eq(client, stream) {
                         if let Some(addr) = to {
                             if client.peer_addr()? != addr {
-                                continue;
+                                continue
                             }
                         }
                         Self::send_packet(client, Packet::Relayed(addr, Vec::from(data)))?;
@@ -209,7 +212,7 @@ impl Matchmaker {
         mm: Arc<Mutex<Self>>,
         peer_addr: SocketAddr,
         stream: Arc<TcpStream>,
-        packet: Packet
+        packet: Packet,
     ) -> Result<(), Error> {
         match &packet {
             Packet::Relay(..) => (),
@@ -236,7 +239,9 @@ impl Matchmaker {
             if let Some(room) = self.rooms.get_mut(&room_id) {
                 for client in &room.clients {
                     let client = client.upgrade();
-                    if client.is_none() { continue; }
+                    if client.is_none() {
+                        continue
+                    }
                     let client = client.unwrap();
                     Self::send_packet(&client, Packet::Disconnected(addr))?;
                 }
@@ -254,7 +259,10 @@ impl Matchmaker {
                 let mut buf = [0; 1];
                 if let Ok(n) = stream.peek(&mut buf) {
                     if n == 0 {
-                        let _ = mm.lock().unwrap().disconnect(peer_addr)
+                        let _ = mm
+                            .lock()
+                            .unwrap()
+                            .disconnect(peer_addr)
                             .or_else(|error| -> Result<_, ()> {
                                 eprintln!("! error/while disconnecting {}: {}", peer_addr, error);
                                 Ok(())
@@ -264,9 +272,7 @@ impl Matchmaker {
                 }
                 let _ = bincode::deserialize_from(&*stream) // what
                     .map_err(|_| Error::Deserialize)
-                    .and_then(|decoded| {
-                        Self::incoming_packet(mm.clone(), peer_addr, stream.clone(), decoded)
-                    })
+                    .and_then(|decoded| Self::incoming_packet(mm.clone(), peer_addr, stream.clone(), decoded))
                     .or_else(|error| -> Result<_, ()> {
                         eprintln!("! error/packet decode from {}: {}", peer_addr, error);
                         Ok(())
@@ -276,7 +282,6 @@ impl Matchmaker {
         });
         Ok(())
     }
-
 }
 
 fn main() -> Result<(), Box<dyn error::Error>> {
@@ -309,4 +314,3 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     Ok(())
 }
-

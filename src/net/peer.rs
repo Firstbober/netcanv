@@ -2,15 +2,15 @@
 // use std::thread;
 
 use std::collections::HashMap;
-use std::net::{SocketAddr};
+use std::net::SocketAddr;
 
+use netcanv_protocol::client as cl;
+use netcanv_protocol::matchmaker as mm;
 use skulpin::skia_safe::{Color, Color4f, Point};
 use thiserror::Error;
 
-use crate::net::socket::{Remote, Error as NetError};
+use crate::net::socket::{Error as NetError, Remote};
 use crate::paint_canvas::{Brush, StrokePoint};
-use netcanv_protocol::client as cl;
-use netcanv_protocol::matchmaker as mm;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -93,7 +93,6 @@ macro_rules! try_or_message {
 }
 
 impl Peer {
-
     pub fn host(nickname: &str, matchmaker_addr: &str) -> Result<Self, Error> {
         let mm = Remote::new(matchmaker_addr)?;
         mm.send(mm::Packet::Host)?;
@@ -142,8 +141,8 @@ impl Peer {
         })
     }
 
-    // is_relayed is an output variable to appease the borrow checker. can't borrow &mut self because of the literal
-    // first borrow in next_packet
+    // is_relayed is an output variable to appease the borrow checker. can't borrow &mut self because of
+    // the literal first borrow in next_packet
     fn connect_to_host(mm: &Remote<mm::Packet>, host_addr: SocketAddr, is_relayed: &mut bool) -> Result<(), Error> {
         // for now we'll always relay packets because i don't think it's possible to do hole punching with
         // rust's stdlib TcpStream
@@ -178,7 +177,6 @@ impl Peer {
         match packet {
             //
             // 0.1.0
-            //
             cl::Packet::Hello(nickname) => {
                 eprintln!("{} ({}) joined", nickname, sender_addr);
                 try_or_message!(self.send(Some(sender_addr), cl::Packet::HiThere(self.nickname.clone())));
@@ -190,45 +188,43 @@ impl Peer {
                 eprintln!("{} ({}) is in the room", nickname, sender_addr);
                 self.add_mate(sender_addr, nickname);
             },
-            cl::Packet::Cursor(x, y, brush_size) => {
+            cl::Packet::Cursor(x, y, brush_size) =>
                 if let Some(mate) = self.mates.get_mut(&sender_addr) {
                     mate.cursor = Point::new(cl::from_fixed29p3(x), cl::from_fixed29p3(y));
                     mate.brush_size = cl::from_fixed15p1(brush_size);
                 } else {
                     eprintln!("{} sus", sender_addr);
-                }
-            },
-            cl::Packet::Stroke(points) => {
-                return Some(Message::Stroke(points.iter().map(|p| {
-                    StrokePoint {
-                        point: Point::new(cl::from_fixed29p3(p.x), cl::from_fixed29p3(p.y)),
-                        brush:
-                            if p.color == 0 {
-                                Brush::Erase { stroke_width: cl::from_fixed15p1(p.brush_size) }
+                },
+            cl::Packet::Stroke(points) =>
+                return Some(Message::Stroke(
+                    points
+                        .iter()
+                        .map(|p| StrokePoint {
+                            point: Point::new(cl::from_fixed29p3(p.x), cl::from_fixed29p3(p.y)),
+                            brush: if p.color == 0 {
+                                Brush::Erase {
+                                    stroke_width: cl::from_fixed15p1(p.brush_size),
+                                }
                             } else {
                                 Brush::Draw {
                                     color: Color4f::from(Color::new(p.color)),
-                                    stroke_width: cl::from_fixed15p1(p.brush_size)
+                                    stroke_width: cl::from_fixed15p1(p.brush_size),
                                 }
-                            }
-                    }
-                }).collect()));
-            },
+                            },
+                        })
+                        .collect(),
+                )),
             #[allow(deprecated)] // remove when 0.3.0 is released
             cl::Packet::CanvasData(chunk_position, png_data) =>
                 return Some(Message::Chunks(vec![(chunk_position, png_data)])),
             //
             // 0.2.0
-            //
             cl::Packet::Version(version) if !cl::compatible_with(version) =>
                 return Some(Message::Error("Client is too old.".into())),
             cl::Packet::Version(_) => (),
-            cl::Packet::ChunkPositions(positions) =>
-                return Some(Message::ChunkPositions(positions)),
-            cl::Packet::GetChunks(positions) =>
-                return Some(Message::GetChunks(sender_addr, positions)),
-            cl::Packet::Chunks(chunks) =>
-                return Some(Message::Chunks(chunks)),
+            cl::Packet::ChunkPositions(positions) => return Some(Message::ChunkPositions(positions)),
+            cl::Packet::GetChunks(positions) => return Some(Message::GetChunks(sender_addr, positions)),
+            cl::Packet::Chunks(chunks) => return Some(Message::Chunks(chunks)),
         }
 
         None
@@ -256,18 +252,19 @@ impl Peer {
                     mm::Packet::HostAddress(addr) => {
                         self.host = Some(*addr);
                         then = Then::SayHello;
-                        message = Some(Self::connect_to_host(mm, *addr, &mut self.is_relayed)
-                            .err()
-                            .map_or(Message::Connected, |e| Message::Error(format!("{}", e))));
+                        message = Some(
+                            Self::connect_to_host(mm, *addr, &mut self.is_relayed)
+                                .err()
+                                .map_or(Message::Connected, |e| Message::Error(format!("{}", e))),
+                        );
                     },
                     mm::Packet::ClientAddress(addr) => (),
                     mm::Packet::Relayed(_, payload) if payload.len() == 0 => then = Then::SayHello,
                     mm::Packet::Relayed(from, payload) => then = Then::ReadRelayed(*from, payload.to_vec()),
-                    mm::Packet::Disconnected(addr) => {
+                    mm::Packet::Disconnected(addr) =>
                         if let Some(mate) = self.mates.remove(&addr) {
                             return Some(Message::Left(mate.nickname))
-                        }
-                    },
+                        },
                     mm::Packet::Error(message) => return Some(Message::Error(message.into())),
                     _ => return None,
                 }
@@ -277,7 +274,9 @@ impl Peer {
         match then {
             Then::Continue => (),
             Then::ReadRelayed(sender, payload) => return self.decode_payload(sender, &payload),
-            Then::SayHello => try_or_message!(self.send(None, cl::Packet::Hello(self.nickname.clone()))),
+            Then::SayHello => {
+                try_or_message!(self.send(None, cl::Packet::Hello(self.nickname.clone())))
+            },
         }
 
         message
@@ -287,39 +286,45 @@ impl Peer {
         if let Some(mm) = &self.matchmaker {
             let _ = mm.tick()?;
         }
-        Ok(Messages {
-            peer: self,
-        })
+        Ok(Messages { peer: self })
     }
 
     pub fn send_cursor(&self, cursor: Point, brush_size: f32) -> Result<(), Error> {
-        self.send(None, cl::Packet::Cursor(
-            cl::to_fixed29p3(cursor.x),
-            cl::to_fixed29p3(cursor.y),
-            cl::to_fixed15p1(brush_size)
-        ))
+        self.send(
+            None,
+            cl::Packet::Cursor(
+                cl::to_fixed29p3(cursor.x),
+                cl::to_fixed29p3(cursor.y),
+                cl::to_fixed15p1(brush_size),
+            ),
+        )
     }
 
     pub fn send_stroke(&self, iterator: impl Iterator<Item = StrokePoint>) -> Result<(), Error> {
-        self.send(None, cl::Packet::Stroke(iterator.map(|p| {
-            cl::StrokePoint {
-                x: cl::to_fixed29p3(p.point.x),
-                y: cl::to_fixed29p3(p.point.y),
-                color: match p.brush {
-                    Brush::Draw { ref color, .. } => {
-                        let color = color.to_color();
-                        ((color.a() as u32) << 24) |
-                        ((color.r() as u32) << 16) |
-                        ((color.g() as u32) << 8) |
-                        color.b() as u32
-                    },
-                    Brush::Erase { .. } => 0,
-                },
-                brush_size: cl::to_fixed15p1(match p.brush {
-                    Brush::Draw { stroke_width, .. } | Brush::Erase { stroke_width } => stroke_width,
-                }),
-            }
-        }).collect()))
+        self.send(
+            None,
+            cl::Packet::Stroke(
+                iterator
+                    .map(|p| cl::StrokePoint {
+                        x: cl::to_fixed29p3(p.point.x),
+                        y: cl::to_fixed29p3(p.point.y),
+                        color: match p.brush {
+                            Brush::Draw { ref color, .. } => {
+                                let color = color.to_color();
+                                ((color.a() as u32) << 24) |
+                                    ((color.r() as u32) << 16) |
+                                    ((color.g() as u32) << 8) |
+                                    color.b() as u32
+                            },
+                            Brush::Erase { .. } => 0,
+                        },
+                        brush_size: cl::to_fixed15p1(match p.brush {
+                            Brush::Draw { stroke_width, .. } | Brush::Erase { stroke_width } => stroke_width,
+                        }),
+                    })
+                    .collect(),
+            ),
+        )
     }
 
     #[allow(deprecated)]
@@ -353,7 +358,6 @@ impl Peer {
     pub fn mates(&self) -> &HashMap<SocketAddr, Mate> {
         &self.mates
     }
-
 }
 
 impl Iterator for Messages<'_> {
@@ -363,4 +367,3 @@ impl Iterator for Messages<'_> {
         self.peer.next_packet()
     }
 }
-

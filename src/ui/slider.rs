@@ -24,7 +24,6 @@ pub struct SliderArgs {
 }
 
 impl Slider {
-
     pub fn new(value: f32, min: f32, max: f32, step: SliderStep) -> Self {
         Self {
             value: (value - min) / (max - min),
@@ -43,13 +42,7 @@ impl Slider {
         }
     }
 
-    pub fn process(
-        &mut self,
-        ui: &mut Ui,
-        canvas: &mut Canvas,
-        input: &Input,
-        SliderArgs { width, color }: SliderArgs,
-    ) {
+    pub fn process(&mut self, ui: &mut Ui, canvas: &mut Canvas, input: &Input, SliderArgs { width, color }: SliderArgs) {
         ui.push_group((width, ui.height()), Layout::Freeform);
 
         if ui.has_mouse(input) && input.mouse_button_just_pressed(MouseButton::Left) {
@@ -104,5 +97,4 @@ impl Slider {
             SliderStep::Discrete(step) => quantize(raw, step),
         }
     }
-
 }

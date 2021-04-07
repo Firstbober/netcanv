@@ -37,7 +37,6 @@ pub struct ButtonProcessResult {
 }
 
 impl Button {
-
     pub fn process(
         ui: &mut Ui,
         canvas: &mut Canvas,
@@ -59,9 +58,11 @@ impl Button {
         let mut clicked = false;
         ui.outline(canvas, colors.outline, 1.0);
         if ui.has_mouse(input) {
-            let fill_color =
-                if input.mouse_button_is_down(MouseButton::Left) { colors.pressed }
-                else { colors.hover };
+            let fill_color = if input.mouse_button_is_down(MouseButton::Left) {
+                colors.pressed
+            } else {
+                colors.hover
+            };
             ui.fill(canvas, fill_color);
             clicked = input.mouse_button_just_released(MouseButton::Left);
 
@@ -170,13 +171,10 @@ impl Button {
             tooltip_position: Some(tooltip_pos)
         })
     }
-
 }
 
 impl ButtonProcessResult {
-
     pub fn clicked(self) -> bool {
         self.clicked
     }
-
 }

@@ -1,17 +1,15 @@
 use std::time::Instant;
 
 use skulpin::skia_safe::*;
-
 use winit::dpi::PhysicalPosition;
 pub use winit::event::{ElementState, MouseButton, VirtualKeyCode};
-use winit::event::{WindowEvent, KeyboardInput};
+use winit::event::{KeyboardInput, WindowEvent};
 
 const MOUSE_BUTTON_COUNT: usize = 8;
 const KEY_CODE_COUNT: usize = 256;
 
 pub struct Input {
     // mouse input
-
     mouse_position: Point,
     previous_mouse_position: Point,
 
@@ -21,17 +19,14 @@ pub struct Input {
     mouse_buttons_locked: bool,
 
     // keyboard input
-
     char_buffer: Vec<char>,
     key_just_typed: [bool; KEY_CODE_COUNT],
 
     // time
-
     time_origin: Instant,
 }
 
 impl Input {
-
     pub fn new() -> Self {
         Self {
             mouse_position: Point::new(0.0, 0.0),
@@ -55,7 +50,9 @@ impl Input {
     }
 
     pub fn mouse_button_is_down(&self, button: MouseButton) -> bool {
-        if self.mouse_buttons_locked { return false }
+        if self.mouse_buttons_locked {
+            return false
+        }
         if let Some(i) = Self::mouse_button_index(button) {
             self.mouse_button_is_down[i]
         } else {
@@ -64,7 +61,9 @@ impl Input {
     }
 
     pub fn mouse_button_just_pressed(&self, button: MouseButton) -> bool {
-        if self.mouse_buttons_locked { return false }
+        if self.mouse_buttons_locked {
+            return false
+        }
         if let Some(i) = Self::mouse_button_index(button) {
             self.mouse_button_just_pressed[i]
         } else {
@@ -73,7 +72,9 @@ impl Input {
     }
 
     pub fn mouse_button_just_released(&self, button: MouseButton) -> bool {
-        if self.mouse_buttons_locked { return false }
+        if self.mouse_buttons_locked {
+            return false
+        }
         if let Some(i) = Self::mouse_button_index(button) {
             self.mouse_button_just_released[i]
         } else {
@@ -108,28 +109,26 @@ impl Input {
 
     pub fn process_event(&mut self, event: &WindowEvent) {
         match event {
-
             WindowEvent::CursorMoved { position, .. } => {
                 let PhysicalPosition { x, y } = position;
                 self.mouse_position = Point::new(*x as _, *y as _);
             },
 
-            WindowEvent::MouseInput { button, state, .. } =>
-                self.process_mouse_input(*button, *state),
+            WindowEvent::MouseInput { button, state, .. } => self.process_mouse_input(*button, *state),
 
             WindowEvent::ReceivedCharacter(c) => self.char_buffer.push(*c),
 
             WindowEvent::KeyboardInput {
-                input: KeyboardInput {
-                    state,
-                    virtual_keycode: Some(key),
-                    ..
-                },
+                input:
+                    KeyboardInput {
+                        state,
+                        virtual_keycode: Some(key),
+                        ..
+                    },
                 ..
             } => self.process_keyboard_input(*key, *state),
 
             _ => (),
-
         }
     }
 
@@ -193,5 +192,4 @@ impl Input {
             }
         }
     }
-
 }

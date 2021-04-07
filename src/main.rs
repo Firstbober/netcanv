@@ -1,14 +1,12 @@
 use std::error::Error;
 
 use skulpin::*;
-
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::WindowBuilder;
-
 #[cfg(target_os = "linux")]
 use winit::platform::unix::WindowBuilderExtUnix;
+use winit::window::WindowBuilder;
 
 mod app;
 mod assets;
@@ -111,7 +109,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ($name:literal) => {
             match clp_matches.value_of($name) {
                 Some(s) => Some(String::from(s)),
-                None => None
+                None => None,
             }
         };
     }
@@ -136,7 +134,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut app: Option<Box<dyn AppState>> = Some(Box::new(lobby::State::new(assets, None)) as _);
 
         let coordinate_system_helper = CoordinateSystemHelper::new(
-            skulpin::ash::vk::Extent2D {width: 1024, height: 600},
+            skulpin::ash::vk::Extent2D {
+                width: 1024,
+                height: 600,
+            },
             skulpin::LogicalSize::new(1024, 600),
             PhysicalSize::new(1024, 600),
             1.0,
@@ -166,19 +167,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         .build(&event_loop)?;
 
-        winit_window.set_window_icon(
-            Some(winit::window::Icon::from_rgba(::image::load_from_memory(NETCANV_ICON).unwrap().to_bytes(), 512, 512).unwrap())
-        );
+        winit_window.set_window_icon(Some(
+            winit::window::Icon::from_rgba(::image::load_from_memory(NETCANV_ICON).unwrap().to_bytes(), 512, 512)
+                .unwrap(),
+        ));
 
         let window = WinitWindow::new(&winit_window);
-        let mut renderer = RendererBuilder::new()
-            .use_vulkan_debug_layer(false)
-            .build(&window)?;
+        let mut renderer = RendererBuilder::new().use_vulkan_debug_layer(false).build(&window)?;
 
         let mut assets = Assets::new(ColorScheme::whd_dark());
         assets.whd_add_commandline(whd_cmd);
-        let mut app: Option<Box<dyn AppState>> =
-            Some(Box::new(lobby::State::new(assets, None)) as _);
+        let mut app: Option<Box<dyn AppState>> = Some(Box::new(lobby::State::new(assets, None)) as _);
         let mut input = Input::new();
 
         event_loop.run(move |event, _, control_flow| {

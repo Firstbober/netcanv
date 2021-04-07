@@ -6,11 +6,11 @@ use std::path::PathBuf;
 use native_dialog::FileDialog;
 use skulpin::skia_safe::*;
 
-use crate::{app::{AppState, StateArgs, paint}, assets::{ColorScheme, ColorSchemeType}, wallhackd::{self, WHDLobbyFunctions}};
+use crate::{app::{paint, AppState, StateArgs}, assets::{ColorScheme, ColorSchemeType}, wallhackd::{self, WHDLobbyFunctions}};
 use crate::assets::Assets;
+use crate::net::{Message, Peer};
 use crate::ui::*;
 use crate::util::get_window_size;
-use crate::net::{Message, Peer};
 
 
 #[derive(Debug)]
@@ -41,7 +41,6 @@ pub struct State {
     ui: Ui,
 
     // UI elements
-
     nickname_field: TextField,
     matchmaker_field: TextField,
     room_id_field: TextField,
@@ -52,8 +51,7 @@ pub struct State {
     // net
     status: Status,
     peer: Option<Peer>,
-    connected: bool, // when this is true, the state is transitioned to paint::State
-
+    connected: bool,             // when this is true, the state is transitioned to paint::State
     image_file: Option<PathBuf>, // when this is Some, the canvas is loaded from a file
 
     // wallhackd
@@ -275,7 +273,6 @@ impl wallhackd::WHDLobbyFunctions for State {
 }
 
 impl State {
-
     pub fn new(assets: Assets, error: Option<&str>) -> Self {
         let username = assets.whd_commandline.username.clone().unwrap_or("Anon".to_owned());
         let mm_addr = assets.whd_commandline.matchmaker_addr.clone().unwrap_or("localhost:62137".to_owned());
@@ -319,7 +316,8 @@ impl State {
 
         self.ui.pop_group();
 
-        self.ui.push_group((self.ui.width(), self.ui.remaining_height()), Layout::Freeform);
+        self.ui
+            .push_group((self.ui.width(), self.ui.remaining_height()), Layout::Freeform);
         self.ui.text(
             canvas,
             "[WHD] by Firstbober. Welcome! Host a room or join an existing one to start painting.",
@@ -353,24 +351,31 @@ impl State {
         };
 
         // nickname, matchmaker
-        self.ui.push_group((self.ui.width(), TextField::labelled_height(&self.ui)), Layout::Horizontal);
-        self.nickname_field.with_label(&mut self.ui, canvas, input, "Nickname", TextFieldArgs {
-            hint: Some("Name shown to others"),
-            .. textfield
-        });
+        self.ui.push_group(
+            (self.ui.width(), TextField::labelled_height(&self.ui)),
+            Layout::Horizontal,
+        );
+        self.nickname_field
+            .with_label(&mut self.ui, canvas, input, "Nickname", TextFieldArgs {
+                hint: Some("Name shown to others"),
+                ..textfield
+            });
         self.ui.space(16.0);
-        self.matchmaker_field.with_label(&mut self.ui, canvas, input, "Matchmaker", TextFieldArgs {
-            hint: Some("IP address"),
-            .. textfield
-        });
+        self.matchmaker_field
+            .with_label(&mut self.ui, canvas, input, "Matchmaker", TextFieldArgs {
+                hint: Some("IP address"),
+                ..textfield
+            });
         self.ui.pop_group();
         self.ui.space(32.0);
 
         // join room
-        if self.join_expand.process(&mut self.ui, canvas, input, ExpandArgs {
-            label: "Join an existing room",
-            .. expand
-        })
+        if self
+            .join_expand
+            .process(&mut self.ui, canvas, input, ExpandArgs {
+                label: "Join an existing room",
+                ..expand
+            })
             .mutually_exclude(&mut self.host_expand)
             .mutually_exclude(&mut self.whd.host_custom_room_id_expand)
             .expanded()
@@ -378,10 +383,11 @@ impl State {
             self.ui.push_group(self.ui.remaining_size(), Layout::Vertical);
             self.ui.offset((32.0, 8.0));
 
-            self.ui.paragraph(canvas, self.assets.colors.text, AlignH::Left, None, &[
-                "Ask your friend for the Room ID",
-                "and enter it into the text field below."
-            ]);
+            self.ui
+                .paragraph(canvas, self.assets.colors.text, AlignH::Left, None, &[
+                    "Ask your friend for the Room ID",
+                    "and enter it into the text field below.",
+                ]);
             self.ui.space(16.0);
             self.ui.push_group((0.0, TextField::labelled_height(&self.ui)), Layout::Horizontal);
             self.room_id_field.with_label(&mut self.ui, canvas, input, "Room ID", TextFieldArgs {
@@ -393,7 +399,7 @@ impl State {
                 match Self::join_room(
                     self.nickname_field.text(),
                     self.matchmaker_field.text(),
-                    self.room_id_field.text()
+                    self.room_id_field.text(),
                 ) {
                     Ok(peer) => {
                         self.peer = Some(peer);
@@ -410,10 +416,12 @@ impl State {
         self.ui.space(16.0);
 
         // host room
-        if self.host_expand.process(&mut self.ui, canvas, input, ExpandArgs {
-            label: "Host a new room",
-            .. expand
-        })
+        if self
+            .host_expand
+            .process(&mut self.ui, canvas, input, ExpandArgs {
+                label: "Host a new room",
+                ..expand
+            })
             .mutually_exclude(&mut self.join_expand)
             .mutually_exclude(&mut self.whd.host_custom_room_id_expand)
             .expanded()
@@ -421,10 +429,11 @@ impl State {
             self.ui.push_group(self.ui.remaining_size(), Layout::Vertical);
             self.ui.offset((32.0, 8.0));
 
-            self.ui.paragraph(canvas, self.assets.colors.text, AlignH::Left, None, &[
-                "Create a blank canvas, or load an existing one from file,",
-                "and share the Room ID with your friends.",
-            ]);
+            self.ui
+                .paragraph(canvas, self.assets.colors.text, AlignH::Left, None, &[
+                    "Create a blank canvas, or load an existing one from file,",
+                    "and share the Room ID with your friends.",
+                ]);
             self.ui.space(16.0);
 
             macro_rules! host_room {
@@ -439,7 +448,8 @@ impl State {
                 };
             }
 
-            self.ui.push_group((self.ui.remaining_width(), 32.0), Layout::Horizontal);
+            self.ui
+                .push_group((self.ui.remaining_width(), 32.0), Layout::Horizontal);
             if Button::with_text(&mut self.ui, canvas, input, button, "Host").clicked() {
                 host_room!();
             }
@@ -447,19 +457,9 @@ impl State {
             if Button::with_text(&mut self.ui, canvas, input, button, "from File").clicked() {
                 match FileDialog::new()
                     .set_filename("canvas.png")
-                    .add_filter(
-                        "Supported image files",
-                        &[
-                            "png",
-                            "jpg", "jpeg", "jfif",
-                            "gif",
-                            "bmp",
-                            "tif", "tiff",
-                            "webp",
-                            "avif",
-                            "pnm",
-                            "tga",
-                        ])
+                    .add_filter("Supported image files", &[
+                        "png", "jpg", "jpeg", "jfif", "gif", "bmp", "tif", "tiff", "webp", "avif", "pnm", "tga",
+                    ])
                     .show_open_single_file()
                 {
                     Ok(Some(path)) => {
@@ -524,12 +524,12 @@ impl State {
                 };
             self.ui.icon(canvas, icon, color, Some((self.ui.height(), self.ui.height())));
             self.ui.space(8.0);
-            self.ui.push_group((self.ui.remaining_width(), self.ui.height()), Layout::Freeform);
-            let text =
-                match &self.status {
-                    Status::None => unreachable!(),
-                    Status::Info(text) | Status::Error(text) => text,
-                };
+            self.ui
+                .push_group((self.ui.remaining_width(), self.ui.height()), Layout::Freeform);
+            let text = match &self.status {
+                Status::None => unreachable!(),
+                Status::Info(text) | Status::Error(text) => text,
+            };
             self.ui.text(canvas, text, color, (AlignH::Left, AlignV::Middle));
 
             self.ui.pop_group();
@@ -582,14 +582,14 @@ impl State {
             return Err(Status::Error("Room ID must be a number with 1–9 digits".into()))
         }
         Self::validate_nickname(nickname)?;
-        let room_id: u32 = room_id_str.parse()
+        let room_id: u32 = room_id_str
+            .parse()
             .map_err(|_| Status::Error("Room ID must be an integer".into()))?;
         Ok(Peer::join(nickname, matchmaker_addr_str, room_id)?)
     }
 }
 
 impl AppState for State {
-
     fn process(
         &mut self,
         StateArgs {
@@ -602,13 +602,14 @@ impl AppState for State {
 
         if let Some(peer) = &mut self.peer {
             match peer.tick() {
-                Ok(messages) => for message in messages {
-                    match message {
-                        Message::Error(error) => self.status = Status::Error(error.into()),
-                        Message::Connected => self.connected = true,
-                        _ => (),
-                    }
-                },
+                Ok(messages) =>
+                    for message in messages {
+                        match message {
+                            Message::Error(error) => self.status = Status::Error(error.into()),
+                            Message::Connected => self.connected = true,
+                            _ => (),
+                        }
+                    },
                 Err(error) => {
                     self.status = error.into();
                 },
@@ -643,5 +644,4 @@ impl AppState for State {
             self
         }
     }
-
 }
