@@ -598,6 +598,11 @@ impl State {
                 } else if self.downloaded_chunks.len() == self.server_side_chunks.len() {
                     ok_or_log!(self.log, self.paint_canvas.save(&self.save_to_file.as_ref().unwrap()));
                     self.save_to_file = None;
+
+                    if self.assets.whd_commandline.headless_client {
+                        log!(self.log, "Saved canvas to file!");
+                        std::process::exit(0);
+                    }
                 }
             } else {
                 for chunk_position in self.viewport.visible_tiles(Chunk::SIZE, canvas_size) {
@@ -789,6 +794,7 @@ impl AppState for State {
                         }
                         Message::Chunks(chunks) =>
                             for (chunk_position, png_data) in chunks {
+                                self.whd.previous_chunk_data_timestamp = Some(SystemTime::now());
                                 Self::canvas_data(&mut self.log, &mut self.paint_canvas, chunk_position, &png_data);
                                 self.downloaded_chunks.insert(chunk_position);
                             },
