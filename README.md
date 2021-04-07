@@ -11,6 +11,7 @@
 - Username length raised to 24 characters
 - Shows number of loaded chunks
 - Teleport around using handy inputs
+- RGB Color input
 
 # NetCanv
 

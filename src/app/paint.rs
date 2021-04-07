@@ -57,6 +57,7 @@ pub struct WHDState {
     select_rgb_color_field_r: TextField,
     select_rgb_color_field_g: TextField,
     select_rgb_color_field_b: TextField,
+    select_rgb_colors: (u8, u8, u8)
 }
 
 pub struct State {
@@ -318,7 +319,14 @@ impl wallhackd::WHDPaintFunctions for State {
                 // Color preview
                 self.ui.push_group((56.0, self.ui.remaining_height()), Layout::Freeform);
                 {
-                    self.ui.fill(canvas, Color::GREEN.with_a(128));
+                    self.ui.fill(
+                        canvas,
+                        Color::from_rgb(
+                            self.whd.select_rgb_colors.0,
+                            self.whd.select_rgb_colors.1,
+                            self.whd.select_rgb_colors.2,
+                        ),
+                    );
                 }
                 self.ui.pop_group();
 
@@ -333,31 +341,47 @@ impl wallhackd::WHDPaintFunctions for State {
                         hint: Some("R"),
                     };
 
-                    let mut clr = Color::BLACK;
-
-
                     if self
                         .whd
                         .select_rgb_color_field_r
                         .process(&mut self.ui, canvas, input, textfield_arg)
                         .changed()
                     {
-                        println!("R color changed");
+                        self.whd.select_rgb_colors.0 = match self.whd.select_rgb_color_field_r.text().parse::<u8>() {
+                            Ok(num) => num,
+                            Err(_err) => 0
+                        };
                     }
 
                     self.ui.space(6.0);
 
                     textfield_arg.hint = Some("G");
-                    self.whd
+                    if self
+                        .whd
                         .select_rgb_color_field_g
-                        .process(&mut self.ui, canvas, input, textfield_arg);
+                        .process(&mut self.ui, canvas, input, textfield_arg)
+                        .changed()
+                    {
+                        self.whd.select_rgb_colors.1 = match self.whd.select_rgb_color_field_g.text().parse::<u8>() {
+                            Ok(num) => num,
+                            Err(err) => 0
+                        };
+                    }
 
                     self.ui.space(6.0);
 
                     textfield_arg.hint = Some("B");
-                    self.whd
+                    if self
+                        .whd
                         .select_rgb_color_field_b
-                        .process(&mut self.ui, canvas, input, textfield_arg);
+                        .process(&mut self.ui, canvas, input, textfield_arg)
+                        .changed()
+                    {
+                        self.whd.select_rgb_colors.1 = match self.whd.select_rgb_color_field_b.text().parse::<u8>() {
+                            Ok(num) => num,
+                            Err(err) => 0
+                        };
+                    }
 
                     self.ui.space(6.0);
 
@@ -374,7 +398,14 @@ impl wallhackd::WHDPaintFunctions for State {
                         "Apply",
                     )
                     .clicked()
-                    {}
+                    {
+                        self.paint_color = Color4f::new (
+                            self.whd.select_rgb_colors.0 as f32 / 255.0,
+                            self.whd.select_rgb_colors.1 as f32 / 255.0,
+                            self.whd.select_rgb_colors.2 as f32 / 255.0,
+                            255.0,
+                        );
+                    }
                 }
                 self.ui.pop_group();
             }
@@ -502,12 +533,12 @@ impl wallhackd::WHDPaintFunctions for State {
                 colors: &self.assets.colors.tool_button,
             },
             &self.assets.icons.whd.palette,
-            "(WIP) RGB Color".to_owned(),
+            "RGB Color".to_owned(),
             WHDTooltipPos::Top,
         )
         .clicked()
         {
-            self.whd.select_rgb_color_window = true;
+            self.whd.select_rgb_color_window = !self.whd.select_rgb_color_window;
         }
     }
     fn whd_bar_end_buttons(&mut self, canvas: &mut Canvas, input: &Input) {
@@ -668,6 +699,7 @@ impl State {
                 select_rgb_color_field_r: TextField::new(Some("0")),
                 select_rgb_color_field_g: TextField::new(Some("0")),
                 select_rgb_color_field_b: TextField::new(Some("0")),
+                select_rgb_colors: (0, 0, 0)
             },
         };
         if this.peer.is_host() {
@@ -1125,7 +1157,7 @@ impl AppState for State {
             }
             Err(error) => {
                 self.error = Some(format!("{}", error));
-            },
+            }
         }
 
         for message in self.deferred_message_queue.drain(..) {
