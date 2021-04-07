@@ -1124,8 +1124,8 @@ impl AppState for State {
                 }
             }
             Err(error) => {
-                eprintln!("{}", error);
-            }
+                self.error = Some(format!("{}", error));
+            },
         }
 
         for message in self.deferred_message_queue.drain(..) {
