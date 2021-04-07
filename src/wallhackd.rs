@@ -16,13 +16,27 @@ pub struct WHDCommandLine {
 	pub load_canvas: Option<String>
 }
 
+pub enum OverlayWindowPos {
+	TopLeft,
+	Top,
+	TopRight,
+
+	MiddleLeft,
+	Middle,
+	MiddleRight,
+
+	BottomLeft,
+	Bottom,
+	BottomRight
+}
+
 pub trait WHDPaintFunctions {
 	fn whd_process_canvas_start(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
 	fn whd_process_canvas_end(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
 	fn whd_process_canvas_custom_image(&mut self, input: &ui::Input);
 
 	fn whd_process_overlay(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
-	fn whd_overlay_window(&mut self, canvas: &mut skia::Canvas, input: &ui::Input, size: (f32, f32), margin: f32, title: &str);
+	fn whd_overlay_window(&mut self, canvas: &mut skia::Canvas, input: &ui::Input, size: (f32, f32), margin: f32, title: &str, pos: OverlayWindowPos);
 
 	fn whd_bar_end_buttons(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
 }

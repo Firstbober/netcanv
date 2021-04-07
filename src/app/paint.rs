@@ -217,20 +217,22 @@ impl wallhackd::WHDPaintFunctions for State {
 
         self.ui.pad((32.0, 32.0));
 
-        //self.whd_overlay_window(canvas, input, (300.0, 200.0), 0.0, "Teleport to chunk");
+        //self.whd_overlay_window(canvas, input, (300.0, 200.0), 0.0, "Teleport to chunk", wallhackd::OverlayWindowPos::BottomRight);
 
         self.ui.pop_group();
     }
 
-    fn whd_overlay_window(&mut self, canvas: &mut Canvas, input: &Input, size: (f32, f32), margin: f32, title: &str) {
-        self.ui.push_group((self.ui.width(), size.1 + 32.0), Layout::HorizontalRev);
+    fn whd_overlay_window(&mut self, canvas: &mut Canvas, input: &Input, size: (f32, f32), margin: f32, title: &str, pos: wallhackd::OverlayWindowPos) {
+        let g_height = size.1 + 32.0;
+
+        self.ui.push_group((self.ui.width(), g_height), Layout::HorizontalRev);
 
         self.ui.pad((margin, 0.0));
 
-        self.ui.push_group((size.0, size.1 + 32.0), Layout::Vertical);
+        self.ui.push_group((size.0, g_height), Layout::Vertical);
         self.ui.fill(canvas, Color::BLACK.with_a(200));
 
-        self.ui.push_group((self.ui.width(), 32.0), Layout::Horizontal);
+        self.ui.push_group((size.0, 32.0), Layout::HorizontalRev);
         self.ui.fill(canvas, Color::BLACK);
 
         self.ui.text(
