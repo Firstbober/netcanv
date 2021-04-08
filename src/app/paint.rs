@@ -437,7 +437,7 @@ impl wallhackd::WHDPaintFunctions for State {
                         .process(&mut self.ui, canvas, input, textfield_arg)
                         .changed()
                     {
-                        self.whd.select_rgb_colors.1 = match self.whd.select_rgb_color_field_b.text().parse::<u8>() {
+                        self.whd.select_rgb_colors.2 = match self.whd.select_rgb_color_field_b.text().parse::<u8>() {
                             Ok(num) => num,
                             Err(_err) => 0,
                         };
