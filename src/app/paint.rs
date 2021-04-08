@@ -57,7 +57,7 @@ pub struct WHDState {
     select_rgb_color_field_r: TextField,
     select_rgb_color_field_g: TextField,
     select_rgb_color_field_b: TextField,
-    select_rgb_colors: (u8, u8, u8)
+    select_rgb_colors: (u8, u8, u8),
 }
 
 pub struct State {
@@ -142,8 +142,10 @@ impl wallhackd::WHDPaintFunctions for State {
 
         // get offset for chunks
 
-        let x_off = ((input.mouse_position().x + self.viewport.pan().x) / 256.0) as i32;
-        let y_off = ((input.mouse_position().y + self.viewport.pan().y) / 256.0) as i32;
+        let x_off = ((input.mouse_position().x + self.viewport.pan().x) / 256.0).round() as i32;
+        let y_off = ((input.mouse_position().y + self.viewport.pan().y) / 256.0).round() as i32;
+
+        println!("{}, {} - offs", x_off, y_off);
 
         let ch_x_off = ((input.mouse_position().x + self.viewport.pan().x) as i32 - (x_off * 256)).abs() as u32;
         let ch_y_off = ((input.mouse_position().y + self.viewport.pan().y) as i32 - (y_off * 256)).abs() as u32;
@@ -222,7 +224,13 @@ impl wallhackd::WHDPaintFunctions for State {
                 match skimg {
                     Some(img) => {
                         chk.canvas.draw_image(img, (0, 0), None);
-                        chunks_to_send.push(((x as i32, y as i32), chk.png_data().unwrap().to_vec()));
+
+                        for addr in self.peer.mates() {
+                            self.peer
+                                .send_chunks(*addr.0, vec![((x as i32, y as i32), chk.png_data().unwrap().to_vec())])
+                                .unwrap();
+                        }
+                        //chunks_to_send.push(((x as i32, y as i32), chk.png_data().unwrap().to_vec()));
                     }
                     None => log!(
                         self.log,
@@ -232,13 +240,10 @@ impl wallhackd::WHDPaintFunctions for State {
             }
         }
 
-        for addr in self.peer.mates() {
-            self.peer.send_chunks(*addr.0, chunks_to_send.clone()).unwrap();
-        }
-
         log!(self.log, "[WallhackD] [Custom Image] Completed!");
 
         self.whd.custom_image_dims = None;
+        self.paint_mode = PaintMode::None;
     }
 
     fn whd_process_overlay(&mut self, canvas: &mut Canvas, input: &mut Input) {
@@ -349,7 +354,7 @@ impl wallhackd::WHDPaintFunctions for State {
                     {
                         self.whd.select_rgb_colors.0 = match self.whd.select_rgb_color_field_r.text().parse::<u8>() {
                             Ok(num) => num,
-                            Err(_err) => 0
+                            Err(_err) => 0,
                         };
                     }
 
@@ -364,7 +369,7 @@ impl wallhackd::WHDPaintFunctions for State {
                     {
                         self.whd.select_rgb_colors.1 = match self.whd.select_rgb_color_field_g.text().parse::<u8>() {
                             Ok(num) => num,
-                            Err(err) => 0
+                            Err(_err) => 0,
                         };
                     }
 
@@ -379,7 +384,7 @@ impl wallhackd::WHDPaintFunctions for State {
                     {
                         self.whd.select_rgb_colors.1 = match self.whd.select_rgb_color_field_b.text().parse::<u8>() {
                             Ok(num) => num,
-                            Err(err) => 0
+                            Err(_err) => 0,
                         };
                     }
 
@@ -399,11 +404,11 @@ impl wallhackd::WHDPaintFunctions for State {
                     )
                     .clicked()
                     {
-                        self.paint_color = Color4f::new (
+                        self.paint_color = Color4f::new(
                             self.whd.select_rgb_colors.0 as f32 / 255.0,
                             self.whd.select_rgb_colors.1 as f32 / 255.0,
                             self.whd.select_rgb_colors.2 as f32 / 255.0,
-                            255.0,
+                            1.0,
                         );
                     }
                 }
@@ -699,7 +704,7 @@ impl State {
                 select_rgb_color_field_r: TextField::new(Some("0")),
                 select_rgb_color_field_g: TextField::new(Some("0")),
                 select_rgb_color_field_b: TextField::new(Some("0")),
-                select_rgb_colors: (0, 0, 0)
+                select_rgb_colors: (0, 0, 0),
             },
         };
         if this.peer.is_host() {
@@ -765,12 +770,15 @@ impl State {
                     self.paint_mode = PaintMode::Paint;
                 } else {
                     self.whd_process_canvas_custom_image(input);
+                    self.paint_mode = PaintMode::None;
                 }
             } else if input.mouse_button_just_pressed(MouseButton::Right) {
                 self.paint_mode = PaintMode::Erase;
             }
         }
-        if input.mouse_button_just_released(MouseButton::Left) || input.mouse_button_just_released(MouseButton::Right) {
+        if (input.mouse_button_just_released(MouseButton::Left) || input.mouse_button_just_released(MouseButton::Right))
+            && (self.paint_mode == PaintMode::Paint || self.paint_mode == PaintMode::Erase)
+        {
             self.paint_mode = PaintMode::None;
         }
 
