@@ -57,6 +57,9 @@ pub enum Message {
 
     // a Chunks-compatible packet received
     Chunks(Vec<((i32, i32), Vec<u8>)>),
+
+    // [WHD] Chat message packet
+    WHDChatMessage(String),
 }
 
 pub struct Mate {
@@ -70,7 +73,7 @@ pub struct Peer {
     is_self: bool,
     is_host: bool,
     is_relayed: bool,
-    nickname: String,
+    pub nickname: String,
     room_id: Option<u32>,
     mates: HashMap<SocketAddr, Mate>,
     host: Option<SocketAddr>,
@@ -102,7 +105,7 @@ impl Peer {
             is_self: true,
             is_host: true,
             is_relayed: false,
-            nickname: format!("[tWHD] {}", nickname),
+            nickname: format!("[tWHD!] {}", nickname),
             room_id: None,
             mates: HashMap::new(),
             host: None,
@@ -118,7 +121,7 @@ impl Peer {
             is_self: true,
             is_host: true,
             is_relayed: false,
-            nickname: format!("[tWHD] {}", nickname),
+            nickname: format!("[tWHD!] {}", nickname),
             room_id: None,
             mates: HashMap::new(),
             host: None,
@@ -134,7 +137,7 @@ impl Peer {
             is_self: true,
             is_host: false,
             is_relayed: false,
-            nickname: format!("[tWHD] {}", nickname),
+            nickname: format!("[tWHD!] {}", nickname),
             room_id: None,
             mates: HashMap::new(),
             host: None,
@@ -169,12 +172,21 @@ impl Peer {
     }
 
     fn decode_payload(&mut self, sender_addr: SocketAddr, payload: &[u8]) -> Option<Message> {
-        let packet = try_or_message!(
-            bincode::deserialize::<cl::Packet>(payload),
-            "Unknown packet received: {}. Check if your client is up to date"
-        );
+        let mut packet: Option<cl::Packet> = None;
 
-        match packet {
+        packet = match bincode::deserialize::<cl::Packet>(payload) {
+            Ok(p) => Some(p),
+            Err(err) => {
+                println!("PacketError: {}", err);
+                None
+            }
+        };
+
+        if packet.is_none() {
+            return None;
+        }
+
+        match packet.unwrap() {
             //
             // 0.1.0
             cl::Packet::Hello(nickname) => {
@@ -225,6 +237,8 @@ impl Peer {
             cl::Packet::ChunkPositions(positions) => return Some(Message::ChunkPositions(positions)),
             cl::Packet::GetChunks(positions) => return Some(Message::GetChunks(sender_addr, positions)),
             cl::Packet::Chunks(chunks) => return Some(Message::Chunks(chunks)),
+
+            cl::Packet::WHDChatMessage(msg) => return Some(Message::WHDChatMessage(msg))
         }
 
         None
@@ -357,6 +371,15 @@ impl Peer {
 
     pub fn mates(&self) -> &HashMap<SocketAddr, Mate> {
         &self.mates
+    }
+
+    // [WHD] Send chat message
+    pub fn whd_send_chat_message(&self, msg: String) {
+        for mate in &self.mates {
+            if mate.1.nickname.starts_with("[tWHD!") {
+                self.send(Some(*mate.0), cl::Packet::WHDChatMessage(msg.clone())).unwrap();
+            }
+        }
     }
 }
 

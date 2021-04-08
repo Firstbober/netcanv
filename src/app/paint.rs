@@ -32,7 +32,59 @@ enum PaintMode {
     WHDCustomImage,
 }
 
-type Log = Vec<(String, Instant)>;
+//type Log = Vec<(String, Instant)>;
+
+struct Log {
+    general_log: Vec<(String, Instant)>,
+    chat_log: VecDeque<String>,
+}
+
+impl Log {
+    pub fn new() -> Log {
+        Log {
+            general_log: Vec::new(),
+            chat_log: VecDeque::new(),
+        }
+    }
+
+    pub fn push_chat(&mut self, msg: String) {
+        let mut f_msg: Option<String> = Some(msg.clone());
+
+        if msg.len() > 100 {
+           let fs: String = msg.chars().take(100).collect();
+           f_msg = Some(fs);
+        }
+
+        self.chat_log.push_back(f_msg.unwrap());
+
+        if self.chat_log.len() > 15 {
+            self.chat_log.pop_front();
+        }
+    }
+
+    pub fn push_general_log(&mut self, el: (String, Instant)) {
+        self.general_log.push(el);
+    }
+
+    pub fn push(&mut self, el: (String, Instant)) {
+        self.general_log.push(el.clone());
+        self.push_chat(el.0);
+    }
+
+    pub fn raw_log_vec(&self) -> Vec<(String, Instant)> {
+        self.general_log.clone()
+    }
+
+    pub fn process_general(&mut self) {
+        self.general_log
+            .retain(|(_, time_created)| time_created.elapsed() < Duration::from_secs(15));
+    }
+
+    pub fn get_chat_str_vec(&mut self) -> Vec<&str> {
+        let str_vec: Vec<&str> = self.chat_log.iter().map(AsRef::as_ref).collect();
+        str_vec
+    }
+}
 
 pub enum WHDCIDrawingDirection {
     ToLeft,
@@ -58,6 +110,9 @@ pub struct WHDState {
     select_rgb_color_field_g: TextField,
     select_rgb_color_field_b: TextField,
     select_rgb_colors: (u8, u8, u8),
+
+    chat_window: bool,
+    chat_textfeld: TextField,
 }
 
 pub struct State {
@@ -142,8 +197,8 @@ impl wallhackd::WHDPaintFunctions for State {
 
         // get offset for chunks
 
-        let x_off = ((input.mouse_position().x + self.viewport.pan().x) / 256.0).round() as i32;
-        let y_off = ((input.mouse_position().y + self.viewport.pan().y) / 256.0).round() as i32;
+        let x_off = ((input.mouse_position().x + self.viewport.pan().x) / 256.0) as i32;
+        let y_off = ((input.mouse_position().y + self.viewport.pan().y) / 256.0) as i32;
 
         println!("{}, {} - offs", x_off, y_off);
 
@@ -419,6 +474,68 @@ impl wallhackd::WHDPaintFunctions for State {
             self.whd_overlay_window_end(input);
         }
 
+        if self.whd.chat_window {
+            if self.whd_overlay_window_begin(
+                canvas,
+                input,
+                (792.0, 300.0),
+                0.0,
+                "Chat",
+                wallhackd::OverlayWindowPos::BottomLeft,
+            ) {
+                self.whd.chat_window = false;
+            }
+
+            self.ui.push_group((self.ui.width(), 262.0), Layout::Freeform);
+            {
+                self.ui
+                    .paragraph(canvas, Color::WHITE, AlignH::Left, Some(1.25), self.log.get_chat_str_vec().as_slice());
+            }
+            self.ui.pop_group();
+
+            self.ui.space(6.0);
+
+            self.ui.push_group((self.ui.width(), 32.0), Layout::Horizontal);
+            {
+                self.whd.chat_textfeld.process(
+                    &mut self.ui,
+                    canvas,
+                    input,
+                    TextFieldArgs {
+                        width: 722.0,
+                        colors: &self.assets.colors.text_field,
+                        hint: Some("Message"),
+                    },
+                );
+
+                self.ui.space(6.0);
+
+                if Button::with_text(
+                    &mut self.ui,
+                    canvas,
+                    input,
+                    ButtonArgs {
+                        height: 32.0,
+                        colors: &self.assets.colors.button,
+                    },
+                    "Send",
+                )
+                .clicked()
+                {
+                    self.whd.chat_window = false;
+
+                    let msg = format!("{}: {}", self.peer.nickname, self.whd.chat_textfeld.text());
+                    self.peer.whd_send_chat_message(msg.clone());
+
+                    self.log.push_chat(msg.clone());
+                    self.log.push_general_log((msg, Instant::now()));
+                }
+            }
+            self.ui.pop_group();
+
+            self.whd_overlay_window_end(input);
+        }
+
         self.ui.pop_group();
     }
 
@@ -544,6 +661,23 @@ impl wallhackd::WHDPaintFunctions for State {
         .clicked()
         {
             self.whd.select_rgb_color_window = !self.whd.select_rgb_color_window;
+        }
+
+        if Button::with_icon_and_tooltip(
+            &mut self.ui,
+            canvas,
+            input,
+            ButtonArgs {
+                height: 32.0,
+                colors: &self.assets.colors.tool_button,
+            },
+            &self.assets.icons.whd.message,
+            "Chat".to_owned(),
+            WHDTooltipPos::Top,
+        )
+        .clicked()
+        {
+            self.whd.chat_window = !self.whd.chat_window;
         }
     }
     fn whd_bar_end_buttons(&mut self, canvas: &mut Canvas, input: &Input) {
@@ -705,6 +839,9 @@ impl State {
                 select_rgb_color_field_g: TextField::new(Some("0")),
                 select_rgb_color_field_b: TextField::new(Some("0")),
                 select_rgb_colors: (0, 0, 0),
+
+                chat_window: false,
+                chat_textfeld: TextField::new(None),
             },
         };
         if this.peer.is_host() {
@@ -738,17 +875,18 @@ impl State {
     }
 
     fn process_log(&mut self, canvas: &mut Canvas) {
-        self.log
-            .retain(|(_, time_created)| time_created.elapsed() < Duration::from_secs(5));
-        self.ui.draw_on_canvas(canvas, |canvas| {
-            let mut paint = Paint::new(Color4f::from(Color::WHITE.with_a(192)), None);
-            paint.set_blend_mode(BlendMode::Difference);
-            let mut y = self.ui.height() - (self.log.len() as f32 - 1.0) * 16.0 - 8.0;
-            for (entry, _) in &self.log {
-                canvas.draw_str(&entry, (8.0, y), &self.assets.sans.borrow(), &paint);
-                y += 16.0;
-            }
-        });
+        self.log.process_general();
+        if !self.whd.chat_window {
+            self.ui.draw_on_canvas(canvas, |canvas| {
+                let mut paint = Paint::new(Color4f::from(Color::WHITE.with_a(192)), None);
+                paint.set_blend_mode(BlendMode::Difference);
+                let mut y = self.ui.height() - (self.log.raw_log_vec().len() as f32 - 1.0) * 16.0 - 8.0;
+                for (entry, _) in &self.log.raw_log_vec() {
+                    canvas.draw_str(&entry, (8.0, y), &self.assets.sans.borrow(), &paint);
+                    y += 16.0;
+                }
+            });
+        }
     }
 
     fn process_canvas(&mut self, canvas: &mut Canvas, input: &mut Input) {
@@ -1158,6 +1296,9 @@ impl AppState for State {
                                 Self::canvas_data(&mut self.log, &mut self.paint_canvas, chunk_position, &png_data);
                                 self.downloaded_chunks.insert(chunk_position);
                             }
+                        }
+                        Message::WHDChatMessage(msg) => {
+                            log!(self.log, "{}", msg);
                         }
                         message => self.deferred_message_queue.push_back(message),
                     }

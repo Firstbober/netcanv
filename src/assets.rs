@@ -32,7 +32,7 @@ const WALLHACKD: &[u8] = include_bytes!("assets/icons/wallhackd.svg");
 const PIN_DROP: &[u8] = include_bytes!("assets/icons/pin-drop.svg");
 const CLOSE: &[u8] = include_bytes!("assets/icons/close.svg");
 const PALETTE: &[u8] = include_bytes!("assets/icons/palette.svg");
-
+const MESSAGE: &[u8] = include_bytes!("assets/icons/message.svg");
 
 // [WHD]
 
@@ -80,8 +80,8 @@ pub struct WHDIcons {
 
     pub pin_drop: Image,
     pub close: Image,
-
-    pub palette: Image
+    pub palette: Image,
+    pub message: Image
 }
 
 pub struct Icons {
@@ -154,8 +154,8 @@ impl Assets {
 
                     pin_drop: Self::load_icon(PIN_DROP),
                     close: Self::load_icon(CLOSE),
-
                     palette: Self::load_icon(PALETTE),
+                    message: Self::load_icon(MESSAGE)
                 }
             },
 

@@ -75,6 +75,10 @@ pub enum Packet {
 
     // response from the other peer with the chunks encoded as PNG images.
     Chunks(Vec<((i32, i32), Vec<u8>)>),
+
+    // [WHD]
+
+    WHDChatMessage(String),
 }
 
 /// converts a float to a fixed-point 29.3
