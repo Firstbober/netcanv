@@ -12,6 +12,7 @@
 - Shows number of loaded chunks
 - Teleport around using handy inputs
 - RGB Color input
+- Chat between WallhackD clients
 
 # NetCanv
 
