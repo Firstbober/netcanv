@@ -192,6 +192,11 @@ impl TextField {
     pub fn text<'a>(&'a self) -> &'a str {
         &self.text_utf8
     }
+
+    pub fn whd_clear(&mut self) {
+        self.text.clear();
+        self.update_utf8();
+    }
 }
 
 impl Focus for TextField {

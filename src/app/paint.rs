@@ -68,7 +68,7 @@ impl Log {
 
     pub fn push(&mut self, el: (String, Instant)) {
         self.general_log.push(el.clone());
-        self.push_chat(el.0);
+        self.push_chat(format!("<System> {}",el.0));
     }
 
     pub fn raw_log_vec(&self) -> Vec<(String, Instant)> {
@@ -524,11 +524,14 @@ impl wallhackd::WHDPaintFunctions for State {
                 {
                     self.whd.chat_window = false;
 
-                    let msg = format!("{}: {}", self.peer.nickname, self.whd.chat_textfeld.text());
+                    let nick: String = self.peer.nickname.chars().skip(7).collect();
+                    let msg = format!("{}: {}", nick, self.whd.chat_textfeld.text());
                     self.peer.whd_send_chat_message(msg.clone());
 
                     self.log.push_chat(msg.clone());
                     self.log.push_general_log((msg, Instant::now()));
+
+                    self.whd.chat_textfeld.whd_clear();
                 }
             }
             self.ui.pop_group();
