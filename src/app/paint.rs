@@ -51,8 +51,8 @@ impl Log {
         let mut f_msg: Option<String> = Some(msg.clone());
 
         if msg.len() > 100 {
-           let fs: String = msg.chars().take(100).collect();
-           f_msg = Some(fs);
+            let fs: String = msg.chars().take(100).collect();
+            f_msg = Some(fs);
         }
 
         self.chat_log.push_back(f_msg.unwrap());
@@ -68,7 +68,7 @@ impl Log {
 
     pub fn push(&mut self, el: (String, Instant)) {
         self.general_log.push(el.clone());
-        self.push_chat(format!("<System> {}",el.0));
+        self.push_chat(format!("<System> {}", el.0));
     }
 
     pub fn raw_log_vec(&self) -> Vec<(String, Instant)> {
@@ -187,7 +187,7 @@ impl wallhackd::WHDPaintFunctions for State {
 
     fn whd_process_canvas_end(&mut self, _canvas: &mut Canvas, _input: &Input) {}
 
-    fn whd_process_canvas_custom_image(&mut self, input: &Input) {
+    fn whd_process_canvas_custom_image(&mut self, input: &Input, canvas_size: (f32, f32)) {
         log!(self.log, "[WallhackD] [Custom Image] Started!");
 
         if self.whd.custom_image.is_none() && self.whd.custom_image_dims.is_none() {
@@ -197,13 +197,16 @@ impl wallhackd::WHDPaintFunctions for State {
 
         // get offset for chunks
 
-        let x_off = ((input.mouse_position().x + self.viewport.pan().x) / 256.0) as i32;
-        let y_off = ((input.mouse_position().y + self.viewport.pan().y) / 256.0) as i32;
+        let vw_pos = self.viewport.to_viewport_space(input.mouse_position(), canvas_size);
 
-        println!("{}, {} - offs", x_off, y_off);
+        let x_off = (vw_pos.x / 256.0).floor() as i32;
+        let y_off = (vw_pos.y / 256.0).floor() as i32;
 
-        let ch_x_off = ((input.mouse_position().x + self.viewport.pan().x) as i32 - (x_off * 256)).abs() as u32;
-        let ch_y_off = ((input.mouse_position().y + self.viewport.pan().y) as i32 - (y_off * 256)).abs() as u32;
+        println!("{}, {} - viewport pos", x_off, y_off);
+        println!("{}, {} - offs", vw_pos.x, vw_pos.y);
+
+        let ch_x_off = (vw_pos.x as i32 - (x_off * 256)).abs() as u32;
+        let ch_y_off = (vw_pos.y as i32 - (y_off * 256)).abs() as u32;
 
         // get image
 
@@ -255,7 +258,7 @@ impl wallhackd::WHDPaintFunctions for State {
                     WHDCIDrawingDirection::ToLeft => {
                         ((x as i32 + x_off as i32) - width_parts as i32, y_off as i32 + y as i32)
                     }
-                    WHDCIDrawingDirection::ToRight => (x as i32 + x_off as i32, y_off as i32 + y as i32),
+                    WHDCIDrawingDirection::ToRight => (x as i32 + x_off as i32, y as i32 + y_off as i32),
                 };
 
                 println!("{}, {}", pos.0, pos.1);
@@ -282,10 +285,9 @@ impl wallhackd::WHDPaintFunctions for State {
 
                         for addr in self.peer.mates() {
                             self.peer
-                                .send_chunks(*addr.0, vec![((x as i32, y as i32), chk.png_data().unwrap().to_vec())])
+                                .send_chunks(*addr.0, vec![(pos, chk.png_data().unwrap().to_vec())])
                                 .unwrap();
                         }
-                        //chunks_to_send.push(((x as i32, y as i32), chk.png_data().unwrap().to_vec()));
                     }
                     None => log!(
                         self.log,
@@ -488,8 +490,13 @@ impl wallhackd::WHDPaintFunctions for State {
 
             self.ui.push_group((self.ui.width(), 262.0), Layout::Freeform);
             {
-                self.ui
-                    .paragraph(canvas, Color::WHITE, AlignH::Left, Some(1.25), self.log.get_chat_str_vec().as_slice());
+                self.ui.paragraph(
+                    canvas,
+                    Color::WHITE,
+                    AlignH::Left,
+                    Some(1.25),
+                    self.log.get_chat_str_vec().as_slice(),
+                );
             }
             self.ui.pop_group();
 
@@ -769,8 +776,6 @@ impl wallhackd::WHDPaintFunctions for State {
                 WHDCIDrawingDirection::ToLeft => WHDCIDrawingDirection::ToRight,
                 WHDCIDrawingDirection::ToRight => WHDCIDrawingDirection::ToLeft,
             };
-
-            self.paint_mode = PaintMode::WHDCustomImage;
         }
 
         if Button::with_icon_and_tooltip(
@@ -904,13 +909,12 @@ impl State {
         //
 
         // drawing
-
         if self.ui.has_mouse(input) {
             if input.mouse_button_just_pressed(MouseButton::Left) {
                 if self.paint_mode != PaintMode::WHDCustomImage {
                     self.paint_mode = PaintMode::Paint;
                 } else {
-                    self.whd_process_canvas_custom_image(input);
+                    self.whd_process_canvas_custom_image(input, canvas_size);
                     self.paint_mode = PaintMode::None;
                 }
             } else if input.mouse_button_just_pressed(MouseButton::Right) {
@@ -924,8 +928,10 @@ impl State {
         }
 
         let brush_size = self.brush_size_slider.value();
-        let from = input.previous_mouse_position() + self.viewport.pan();
-        let to = input.mouse_position() + self.viewport.pan();
+        let from = self
+            .viewport
+            .to_viewport_space(input.previous_mouse_position(), self.ui.size());
+        let to = self.viewport.to_viewport_space(input.mouse_position(), self.ui.size());
         if !self.whd.lock_painting {
             loop {
                 // give me back my labelled blocks
@@ -949,11 +955,11 @@ impl State {
                 } else if to != self.stroke_buffer.last().unwrap().point {
                     self.stroke_buffer.push(StrokePoint { point: to, brush });
                 }
-                break;
+                break
             }
         }
 
-        // panning
+        // panning and zooming
 
         if self.ui.has_mouse(input) && input.mouse_button_just_pressed(MouseButton::Middle) {
             self.panning = true;
@@ -966,6 +972,7 @@ impl State {
             let delta_pan = input.previous_mouse_position() - input.mouse_position();
             self.viewport.pan_around(delta_pan);
         }
+        self.viewport.zoom_in(input.mouse_scroll().y);
 
         //
         // rendering
@@ -974,6 +981,8 @@ impl State {
         let paint_canvas = &self.paint_canvas;
         self.ui.draw_on_canvas(canvas, |canvas| {
             canvas.save();
+            canvas.translate((self.ui.width() / 2.0, self.ui.height() / 2.0));
+            canvas.scale((self.viewport.zoom(), self.viewport.zoom()));
             canvas.translate(-self.viewport.pan());
 
             let mut paint = Paint::new(Color4f::from(Color::WHITE.with_a(192)), None);
