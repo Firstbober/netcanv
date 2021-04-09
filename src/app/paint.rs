@@ -1312,9 +1312,6 @@ impl AppState for State {
                                 self.whd.previous_chunk_data_timestamp = Some(SystemTime::now());
                                 Self::canvas_data(&mut self.log, &mut self.paint_canvas, chunk_position, &png_data);
                                 self.downloaded_chunks.insert(chunk_position);
-
-                                let mut f = std::fs::File::create(format!("ch{}_{}.png", chunk_position.0, chunk_position.1)).unwrap();
-                                f.write_all(png_data.as_slice()).unwrap();
                             }
                         }
                         Message::WHDChatMessage(msg) => {
