@@ -1,5 +1,5 @@
+use std::{borrow::BorrowMut, collections::VecDeque, ops::Index, str::FromStr};
 use std::{collections::HashSet, io::Write};
-use std::{borrow::BorrowMut, collections::VecDeque, str::FromStr};
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -113,6 +113,9 @@ pub struct WHDState {
 
     chat_window: bool,
     chat_textfeld: TextField,
+
+    teleport_to_person_window: bool,
+    teleport_to_person_list_offset: u32,
 }
 
 pub struct State {
@@ -300,7 +303,11 @@ impl wallhackd::WHDPaintFunctions for State {
             self.peer.send_chunks(*addr.0, chunks_to_send.clone()).unwrap();
         }
 
-        log!(self.log, "[WallhackD] [Custom Image] Sent {} chunks", chunks_to_send.len());
+        log!(
+            self.log,
+            "[WallhackD] [Custom Image] Sent {} chunks",
+            chunks_to_send.len()
+        );
 
         log!(self.log, "[WallhackD] [Custom Image] Completed!");
 
@@ -544,6 +551,116 @@ impl wallhackd::WHDPaintFunctions for State {
                     self.log.push_general_log((msg, Instant::now()));
 
                     self.whd.chat_textfeld.whd_clear();
+                }
+            }
+            self.ui.pop_group();
+
+            self.whd_overlay_window_end(input);
+        }
+
+        if self.whd.teleport_to_person_window {
+            if self.whd_overlay_window_begin(
+                canvas,
+                input,
+                (214.0, 300.0),
+                0.0,
+                "Teleport to person",
+                wallhackd::OverlayWindowPos::TopLeft,
+            ) {
+                self.whd.teleport_to_person_window = false;
+            }
+
+            let mut count = 0;
+            let mates = self.peer.mates();
+
+            self.ui.push_group((self.ui.width(), 32.0 * 8.0), Layout::Vertical);
+            for x in mates {
+                if count < 6 * self.whd.teleport_to_person_list_offset {
+                    count += 1;
+                    continue;
+                }
+
+                if count > 6 * (self.whd.teleport_to_person_list_offset + 1) {
+                    break;
+                }
+
+                self.ui.push_group((self.ui.width(), 32.0), Layout::Horizontal);
+                {
+                    self.ui
+                        .push_group((self.ui.width() - 32.0 - 6.0, 32.0), Layout::Freeform);
+                    let new_nk: String = x.1.nickname.chars().take(24).collect();
+                    self.ui.text(
+                        canvas,
+                        new_nk.as_str(),
+                        Color::WHITE,
+                        (AlignH::Left, AlignV::Middle),
+                    );
+                    self.ui.pop_group();
+
+                    self.ui.space(6.0);
+
+                    if Button::with_icon_and_tooltip(
+                        &mut self.ui,
+                        canvas,
+                        input,
+                        ButtonArgs {
+                            height: 32.0,
+                            colors: &self.assets.colors.tool_button,
+                        },
+                        &self.assets.icons.whd.pin_drop,
+                        "Teleport".to_owned(),
+                        WHDTooltipPos::Top,
+                    )
+                    .clicked()
+                    {
+                        self.viewport.whd_set_pan(x.1.cursor);
+                        log!(self.log, "[WallhackD] [TP2P] Teleported to: {}", x.1.nickname);
+                    }
+                }
+                self.ui.pop_group();
+                self.ui.space(6.0);
+
+                count += 1;
+            }
+            self.ui.pop_group();
+            self.ui.space(10.0);
+
+            self.ui.push_group((self.ui.width(), 32.0), Layout::Horizontal);
+            {
+                if Button::with_text(
+                    &mut self.ui,
+                    canvas,
+                    input,
+                    ButtonArgs {
+                        height: 32.0,
+                        colors: &self.assets.colors.button,
+                    },
+                    "Prev",
+                )
+                .clicked()
+                {
+                    if self.whd.teleport_to_person_list_offset != 0 {
+                        self.whd.teleport_to_person_list_offset -= 1;
+                    }
+                }
+
+                self.ui.space(8.0);
+
+                if Button::with_text(
+                    &mut self.ui,
+                    canvas,
+                    input,
+                    ButtonArgs {
+                        height: 32.0,
+                        colors: &self.assets.colors.button,
+                    },
+                    "Next",
+                )
+                .clicked()
+                {
+                    if self.whd.teleport_to_person_list_offset * 6 < mates.len() as u32 {
+                        self.whd.teleport_to_person_list_offset += 1;
+                    }
                 }
             }
             self.ui.pop_group();
@@ -799,6 +916,23 @@ impl wallhackd::WHDPaintFunctions for State {
         {
             self.whd.teleport_to_chunk_window = !self.whd.teleport_to_chunk_window;
         }
+
+        if Button::with_icon_and_tooltip(
+            &mut self.ui,
+            canvas,
+            input,
+            ButtonArgs {
+                height: 32.0,
+                colors: &self.assets.colors.tool_button,
+            },
+            &self.assets.icons.whd.person_pin_circle,
+            "Teleport to person".to_owned(),
+            WHDTooltipPos::Top,
+        )
+        .clicked()
+        {
+            self.whd.teleport_to_person_window = !self.whd.teleport_to_person_window;
+        }
     }
 }
 
@@ -855,6 +989,9 @@ impl State {
 
                 chat_window: false,
                 chat_textfeld: TextField::new(None),
+
+                teleport_to_person_window: false,
+                teleport_to_person_list_offset: 0,
             },
         };
         if this.peer.is_host() {

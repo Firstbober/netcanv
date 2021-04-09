@@ -33,6 +33,7 @@ const PIN_DROP: &[u8] = include_bytes!("assets/icons/pin-drop.svg");
 const CLOSE: &[u8] = include_bytes!("assets/icons/close.svg");
 const PALETTE: &[u8] = include_bytes!("assets/icons/palette.svg");
 const MESSAGE: &[u8] = include_bytes!("assets/icons/message.svg");
+const PERSON_PIN_CIRCLE: &[u8] = include_bytes!("assets/icons/person-pin-circle.svg");
 
 // [WHD]
 
@@ -81,7 +82,8 @@ pub struct WHDIcons {
     pub pin_drop: Image,
     pub close: Image,
     pub palette: Image,
-    pub message: Image
+    pub message: Image,
+    pub person_pin_circle: Image
 }
 
 pub struct Icons {
@@ -155,7 +157,8 @@ impl Assets {
                     pin_drop: Self::load_icon(PIN_DROP),
                     close: Self::load_icon(CLOSE),
                     palette: Self::load_icon(PALETTE),
-                    message: Self::load_icon(MESSAGE)
+                    message: Self::load_icon(MESSAGE),
+                    person_pin_circle: Self::load_icon(PERSON_PIN_CIRCLE)
                 }
             },
 
