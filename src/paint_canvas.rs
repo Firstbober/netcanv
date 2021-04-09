@@ -48,7 +48,7 @@ impl Brush {
 pub struct Chunk<'a> {
     bitmap: Bitmap,
     pub canvas: OwnedCanvas<'a>,
-    png_data: Option<Vec<u8>>,
+    pub png_data: Option<Vec<u8>>,
 }
 
 impl<'a> Chunk<'a> {

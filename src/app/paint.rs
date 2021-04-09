@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, io::Write};
 use std::{borrow::BorrowMut, collections::VecDeque, str::FromStr};
 
 use std::path::PathBuf;
@@ -22,7 +22,7 @@ use crate::{assets::*, ui};
 use std::time::SystemTime;
 
 extern crate image;
-use image::{GenericImage, GenericImageView, Pixel, SubImage};
+use image::{GenericImage, GenericImageView, Pixel, RgbaImage, SubImage};
 
 #[derive(PartialEq, Eq)]
 enum PaintMode {
@@ -282,12 +282,11 @@ impl wallhackd::WHDPaintFunctions for State {
                 match skimg {
                     Some(img) => {
                         chk.canvas.draw_image(img, (0, 0), None);
+                        chk.png_data = None;
 
-                        for addr in self.peer.mates() {
-                            self.peer
-                                .send_chunks(*addr.0, vec![(pos, chk.png_data().unwrap().to_vec())])
-                                .unwrap();
-                        }
+                        chunks_to_send.push((pos, chk.png_data().unwrap().to_vec()));
+
+                        eprintln!("Sent chunk {}, {}", pos.0, pos.1);
                     }
                     None => log!(
                         self.log,
@@ -296,6 +295,12 @@ impl wallhackd::WHDPaintFunctions for State {
                 };
             }
         }
+
+        for addr in self.peer.mates() {
+            self.peer.send_chunks(*addr.0, chunks_to_send.clone()).unwrap();
+        }
+
+        log!(self.log, "[WallhackD] [Custom Image] Sent {} chunks", chunks_to_send.len());
 
         log!(self.log, "[WallhackD] [Custom Image] Completed!");
 
@@ -955,7 +960,7 @@ impl State {
                 } else if to != self.stroke_buffer.last().unwrap().point {
                     self.stroke_buffer.push(StrokePoint { point: to, brush });
                 }
-                break
+                break;
             }
         }
 
@@ -1307,6 +1312,9 @@ impl AppState for State {
                                 self.whd.previous_chunk_data_timestamp = Some(SystemTime::now());
                                 Self::canvas_data(&mut self.log, &mut self.paint_canvas, chunk_position, &png_data);
                                 self.downloaded_chunks.insert(chunk_position);
+
+                                let mut f = std::fs::File::create(format!("ch{}_{}.png", chunk_position.0, chunk_position.1)).unwrap();
+                                f.write_all(png_data.as_slice()).unwrap();
                             }
                         }
                         Message::WHDChatMessage(msg) => {
