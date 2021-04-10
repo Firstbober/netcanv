@@ -301,29 +301,7 @@ impl wallhackd::WHDPaintFunctions for State {
                 match skimg {
                     Some(img) => {
                         chk.surface.borrow_mut().canvas().draw_image(img, (0, 0), None);
-                        /*
-                        for sub_x in 0..Chunk::SUB_CHUNKS.0 {
-                            for sub_y in 0..Chunk::SUB_CHUNKS.1 {
-                                match chk.png_data((sub_x * sub_y) as usize) {
-                                    Some(data) => {
-                                        chunks_to_send.push(((sub_x as i32 * x_off, sub_y as i32 * y_off), data.to_vec()));
-                                    }
-                                    None => (),
-                                };
-                            }
-                        }
-                        */
-
-                        //chk.upload_image(sfimg, (0, 0));
-                        //chk.download_image().save(format!("ch{}_{}.png", pos.0, pos.1));
-                        /*
-                        chk.canvas.draw_image(img, (0, 0), None);
-                        chk.png_data = None;
-
-                        chunks_to_send.push((pos, chk.png_data().unwrap().to_vec()));
-                        */
-
-                        eprintln!("Pushed master chunk {}, {}", pos.0, pos.1);
+                        eprintln!("Drawed master chunk {}, {}", pos.0, pos.1);
                     }
                     None => log!(
                         self.log,
@@ -344,18 +322,18 @@ impl wallhackd::WHDPaintFunctions for State {
 
                 let chk = self.paint_canvas.chunks.get_mut(&pos).unwrap();
 
-                //self.paint_canvas.png_data(chunk_position)
+                for sub in 0..Chunk::SUB_COUNT {
+                    let sub_pos = Chunk::sub_position(sub);
+                    let chk_pos = ((pos.0 * 4) + sub_pos.0 as i32, (pos.1 * 4) + sub_pos.1 as i32);
 
-                for sub_x in 0..Chunk::SUB_CHUNKS.0 {
-                    for sub_y in 0..Chunk::SUB_CHUNKS.1 {
-                        let ps = Chunk::sub_position((sub_x * sub_y) as usize);
-                        println!("{}, {} = sub_pos | {}, {} = conv_pos", sub_x, sub_y, ps.0, ps.1);
-                        match chk.png_data((sub_x * sub_y) as usize) {
-                            Some(data) => {
-                                chunks_to_send.push(((ps.0 as i32 * pos.0, ps.1 as i32 * pos.1), data.to_vec()));
-                            }
-                            None => (),
-                        };
+                    chk.png_data[sub] = None;
+
+                    match chk.png_data(sub) {
+                        Some(data) => {
+                            chunks_to_send.push((chk_pos, data.to_vec()));
+                            eprintln!("Pushed chunk {}, {}", chk_pos.0, chk_pos.1);
+                        }
+                        None => (),
                     }
                 }
             }
@@ -871,7 +849,6 @@ impl wallhackd::WHDPaintFunctions for State {
         }
     }
     fn whd_bar_end_buttons(&mut self, canvas: &mut Canvas, input: &Input) {
-        /* TODO: Fix networking
         if Button::with_icon_and_tooltip(
             &mut self.ui,
             canvas,
@@ -958,7 +935,6 @@ impl wallhackd::WHDPaintFunctions for State {
                 WHDCIDrawingDirection::ToRight => WHDCIDrawingDirection::ToLeft,
             };
         }
-        */
 
         if Button::with_icon_and_tooltip(
             &mut self.ui,
@@ -1138,6 +1114,7 @@ impl State {
                 }
             } else if input.mouse_button_just_pressed(MouseButton::Right) {
                 self.paint_mode = PaintMode::Erase;
+                self.whd.custom_image_dims = None;
             }
         }
         if (input.mouse_button_just_released(MouseButton::Left) || input.mouse_button_just_released(MouseButton::Right))
@@ -1233,7 +1210,6 @@ impl State {
             let zoomed_brush_size = brush_size * self.viewport.zoom();
             paint.set_style(skpaint::Style::Stroke);
 
-            // TODO: Fix to use zoomed brush size
             if self.whd.custom_image_dims.is_some() {
                 let dims = self.whd.custom_image_dims.unwrap();
                 let x_off = match self.whd.drawing_direction {
@@ -1247,23 +1223,28 @@ impl State {
                         let ch_x_off =
                             ((input.mouse_position().x + self.viewport.pan().x) as i32 - (x_off2 * 256)).abs() as u32;
 
-                        /*
                         canvas.draw_rect(
                             Rect::from_point_and_size(
-                                ((mouse.x - x_off) - ch_x_off as f32 - 32.0, mouse.y),
-                                ((dims.0 + ch_x_off) as i32 + 32, dims.1 as i32),
+                                ((mouse_position.x - (x_off * self.viewport.zoom())) - (ch_x_off as f32 * self.viewport.zoom()) as f32 - 32.0, mouse_position.y),
+                                (
+                                    ((dims.0 + ch_x_off) as f32 * self.viewport.zoom()) as i32 + 32,
+                                    (dims.1 as f32 * self.viewport.zoom()) as i32,
+                                ),
                             ),
                             &paint,
                         );
-                        */
                     }
                     WHDCIDrawingDirection::ToRight => {
-                        /*
                         canvas.draw_rect(
-                            Rect::from_point_and_size((mouse.x - x_off as f32, mouse.y), (dims.0 as i32, dims.1 as i32)),
+                            Rect::from_point_and_size(
+                                (mouse_position.x - x_off as f32, mouse_position.y),
+                                (
+                                    (dims.0 as f32 * self.viewport.zoom()) as i32,
+                                    (dims.1 as f32 * self.viewport.zoom()) as i32,
+                                ),
+                            ),
                             &paint,
                         );
-                        */
                     }
                 };
             }
