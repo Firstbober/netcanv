@@ -33,7 +33,7 @@ pub enum OverlayWindowPos {
 pub trait WHDPaintFunctions {
     fn whd_process_canvas_start(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
     fn whd_process_canvas_end(&mut self, canvas: &mut skia::Canvas, input: &ui::Input);
-    fn whd_process_canvas_custom_image(&mut self, input: &ui::Input, canvas_size: (f32, f32));
+    fn whd_process_canvas_custom_image(&mut self, canvas: &mut skia::Canvas, input: &ui::Input, canvas_size: (f32, f32));
 
     fn whd_process_overlay(&mut self, canvas: &mut skia::Canvas, input: &mut ui::Input);
     fn whd_overlay_window_begin(

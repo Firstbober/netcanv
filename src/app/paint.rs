@@ -118,11 +118,17 @@ pub struct WHDState {
     teleport_to_person_list_offset: u32,
 }
 
+struct Tip {
+    text: String,
+    created: Instant,
+    visible_duration: Duration,
+}
+
 pub struct State {
     assets: Assets,
 
     ui: Ui,
-    paint_canvas: PaintCanvas<'static>,
+    paint_canvas: PaintCanvas,
     peer: Peer,
     update_timer: Timer,
 
@@ -137,10 +143,12 @@ pub struct State {
     needed_chunks: HashSet<(i32, i32)>,
     deferred_message_queue: VecDeque<Message>,
 
+    load_from_file: Option<PathBuf>,
     save_to_file: Option<PathBuf>,
 
     error: Option<String>,
     log: Log,
+    tip: Tip,
 
     panning: bool,
     viewport: Viewport,
@@ -190,7 +198,7 @@ impl wallhackd::WHDPaintFunctions for State {
 
     fn whd_process_canvas_end(&mut self, _canvas: &mut Canvas, _input: &Input) {}
 
-    fn whd_process_canvas_custom_image(&mut self, input: &Input, canvas_size: (f32, f32)) {
+    fn whd_process_canvas_custom_image(&mut self, canvas: &mut Canvas, input: &Input, canvas_size: (f32, f32)) {
         log!(self.log, "[WallhackD] [Custom Image] Started!");
 
         if self.whd.custom_image.is_none() && self.whd.custom_image_dims.is_none() {
@@ -202,14 +210,14 @@ impl wallhackd::WHDPaintFunctions for State {
 
         let vw_pos = self.viewport.to_viewport_space(input.mouse_position(), canvas_size);
 
-        let x_off = (vw_pos.x / 256.0).floor() as i32;
-        let y_off = (vw_pos.y / 256.0).floor() as i32;
+        let x_off = (vw_pos.x / 1024.0).floor() as i32;
+        let y_off = (vw_pos.y / 1024.0).floor() as i32;
 
         println!("{}, {} - viewport pos", x_off, y_off);
         println!("{}, {} - offs", vw_pos.x, vw_pos.y);
 
-        let ch_x_off = (vw_pos.x as i32 - (x_off * 256)).abs() as u32;
-        let ch_y_off = (vw_pos.y as i32 - (y_off * 256)).abs() as u32;
+        let ch_x_off = (vw_pos.x as i32 - (x_off * 1024)).abs() as u32;
+        let ch_y_off = (vw_pos.y as i32 - (y_off * 1024)).abs() as u32;
 
         // get image
 
@@ -224,8 +232,16 @@ impl wallhackd::WHDPaintFunctions for State {
 
         // calculate parts
 
-        let width_parts = if dm.0 % 256 != 0 { (dm.0 / 256) + 1 } else { dm.0 / 256 };
-        let height_parts = if dm.1 % 256 != 0 { (dm.1 / 256) + 1 } else { dm.1 / 256 };
+        let width_parts = if dm.0 % 1024 != 0 {
+            (dm.0 / 1024) + 1
+        } else {
+            dm.0 / 1024
+        };
+        let height_parts = if dm.1 % 1024 != 0 {
+            (dm.1 / 1024) + 1
+        } else {
+            dm.1 / 1024
+        };
 
         log!(
             self.log,
@@ -248,13 +264,13 @@ impl wallhackd::WHDPaintFunctions for State {
         for x in 0..width_parts {
             for y in 0..height_parts {
                 if y == height_parts - 1 && x == width_parts - 1 {
-                    new_to_insert = trollage.view(x * 256, y * 256, dm.0 - x * 256, dm.1 - y * 256);
+                    new_to_insert = trollage.view(x * 1024, y * 1024, dm.0 - x * 1024, dm.1 - y * 1024);
                 } else if y == height_parts - 1 {
-                    new_to_insert = trollage.view(x * 256, y * 256, 256, dm.1 - y * 256);
+                    new_to_insert = trollage.view(x * 1024, y * 1024, 1024, dm.1 - y * 1024);
                 } else if x == width_parts - 1 {
-                    new_to_insert = trollage.view(x * 256, y * 256, dm.0 - x * 256, 256);
+                    new_to_insert = trollage.view(x * 1024, y * 1024, dm.0 - x * 1024, 1024);
                 } else {
-                    new_to_insert = trollage.view(x * 256, y * 256, 256, 256);
+                    new_to_insert = trollage.view(x * 1024, y * 1024, 1024, 1024);
                 }
 
                 let pos = match self.whd.drawing_direction {
@@ -266,7 +282,7 @@ impl wallhackd::WHDPaintFunctions for State {
 
                 println!("{}, {}", pos.0, pos.1);
 
-                self.paint_canvas.ensure_chunk_exists(pos);
+                self.paint_canvas.ensure_chunk_exists(canvas, pos);
                 let chk = self.paint_canvas.chunks.get_mut(&pos).unwrap();
 
                 let sfimg = new_to_insert.to_image();
@@ -284,18 +300,64 @@ impl wallhackd::WHDPaintFunctions for State {
 
                 match skimg {
                     Some(img) => {
+                        chk.surface.borrow_mut().canvas().draw_image(img, (0, 0), None);
+                        /*
+                        for sub_x in 0..Chunk::SUB_CHUNKS.0 {
+                            for sub_y in 0..Chunk::SUB_CHUNKS.1 {
+                                match chk.png_data((sub_x * sub_y) as usize) {
+                                    Some(data) => {
+                                        chunks_to_send.push(((sub_x as i32 * x_off, sub_y as i32 * y_off), data.to_vec()));
+                                    }
+                                    None => (),
+                                };
+                            }
+                        }
+                        */
+
+                        //chk.upload_image(sfimg, (0, 0));
+                        //chk.download_image().save(format!("ch{}_{}.png", pos.0, pos.1));
+                        /*
                         chk.canvas.draw_image(img, (0, 0), None);
                         chk.png_data = None;
 
                         chunks_to_send.push((pos, chk.png_data().unwrap().to_vec()));
+                        */
 
-                        eprintln!("Sent chunk {}, {}", pos.0, pos.1);
+                        eprintln!("Pushed master chunk {}, {}", pos.0, pos.1);
                     }
                     None => log!(
                         self.log,
                         "[WallhackD] [Custom Image] !! Something broke and image can't be pasted"
                     ),
                 };
+            }
+        }
+
+        for x in 0..width_parts {
+            for y in 0..height_parts {
+                let pos = match self.whd.drawing_direction {
+                    WHDCIDrawingDirection::ToLeft => {
+                        ((x as i32 + x_off as i32) - width_parts as i32, y_off as i32 + y as i32)
+                    }
+                    WHDCIDrawingDirection::ToRight => (x as i32 + x_off as i32, y as i32 + y_off as i32),
+                };
+
+                let chk = self.paint_canvas.chunks.get_mut(&pos).unwrap();
+
+                //self.paint_canvas.png_data(chunk_position)
+
+                for sub_x in 0..Chunk::SUB_CHUNKS.0 {
+                    for sub_y in 0..Chunk::SUB_CHUNKS.1 {
+                        let ps = Chunk::sub_position((sub_x * sub_y) as usize);
+                        println!("{}, {} = sub_pos | {}, {} = conv_pos", sub_x, sub_y, ps.0, ps.1);
+                        match chk.png_data((sub_x * sub_y) as usize) {
+                            Some(data) => {
+                                chunks_to_send.push(((ps.0 as i32 * pos.0, ps.1 as i32 * pos.1), data.to_vec()));
+                            }
+                            None => (),
+                        };
+                    }
+                }
             }
         }
 
@@ -589,12 +651,8 @@ impl wallhackd::WHDPaintFunctions for State {
                     self.ui
                         .push_group((self.ui.width() - 32.0 - 6.0, 32.0), Layout::Freeform);
                     let new_nk: String = x.1.nickname.chars().take(24).collect();
-                    self.ui.text(
-                        canvas,
-                        new_nk.as_str(),
-                        Color::WHITE,
-                        (AlignH::Left, AlignV::Middle),
-                    );
+                    self.ui
+                        .text(canvas, new_nk.as_str(), Color::WHITE, (AlignH::Left, AlignV::Middle));
                     self.ui.pop_group();
 
                     self.ui.space(6.0);
@@ -813,6 +871,7 @@ impl wallhackd::WHDPaintFunctions for State {
         }
     }
     fn whd_bar_end_buttons(&mut self, canvas: &mut Canvas, input: &Input) {
+        /* TODO: Fix networking
         if Button::with_icon_and_tooltip(
             &mut self.ui,
             canvas,
@@ -899,6 +958,7 @@ impl wallhackd::WHDPaintFunctions for State {
                 WHDCIDrawingDirection::ToRight => WHDCIDrawingDirection::ToLeft,
             };
         }
+        */
 
         if Button::with_icon_and_tooltip(
             &mut self.ui,
@@ -960,10 +1020,16 @@ impl State {
             needed_chunks: HashSet::new(),
             deferred_message_queue: VecDeque::new(),
 
+            load_from_file: image_path,
             save_to_file: None,
 
             error: None,
             log: Log::new(),
+            tip: Tip {
+                text: "".into(),
+                created: Instant::now(),
+                visible_duration: Default::default(),
+            },
 
             panning: false,
             viewport: Viewport::new(),
@@ -1001,13 +1067,18 @@ impl State {
                 "To invite friends, send them the room ID shown in the bottom right corner of your screen."
             );
         }
-        if let Some(image_path) = image_path {
-            ok_or_log!(this.log, this.paint_canvas.load_from_image_file(&image_path));
-        }
         this
     }
 
-    fn fellow_stroke(canvas: &mut PaintCanvas, points: &[StrokePoint]) {
+    fn show_tip(&mut self, text: &str, duration: Duration) {
+        self.tip = Tip {
+            text: text.into(),
+            created: Instant::now(),
+            visible_duration: duration,
+        };
+    }
+
+    fn fellow_stroke(canvas: &mut Canvas, paint_canvas: &mut PaintCanvas, points: &[StrokePoint]) {
         if points.is_empty() {
             return;
         } // failsafe
@@ -1015,13 +1086,19 @@ impl State {
         let mut from = points[0].point;
         let first_index = if points.len() > 1 { 1 } else { 0 };
         for point in &points[first_index..] {
-            canvas.stroke(from, point.point, &point.brush);
+            paint_canvas.stroke(canvas, from, point.point, &point.brush);
             from = point.point;
         }
     }
 
-    fn canvas_data(log: &mut Log, canvas: &mut PaintCanvas, chunk_position: (i32, i32), png_image: &[u8]) {
-        ok_or_log!(log, canvas.decode_png_data(chunk_position, png_image));
+    fn canvas_data(
+        log: &mut Log,
+        canvas: &mut Canvas,
+        paint_canvas: &mut PaintCanvas,
+        chunk_position: (i32, i32),
+        png_image: &[u8],
+    ) {
+        ok_or_log!(log, paint_canvas.decode_png_data(canvas, chunk_position, png_image));
     }
 
     fn process_log(&mut self, canvas: &mut Canvas) {
@@ -1056,7 +1133,7 @@ impl State {
                 if self.paint_mode != PaintMode::WHDCustomImage {
                     self.paint_mode = PaintMode::Paint;
                 } else {
-                    self.whd_process_canvas_custom_image(input, canvas_size);
+                    self.whd_process_canvas_custom_image(canvas, input, canvas_size);
                     self.paint_mode = PaintMode::None;
                 }
             } else if input.mouse_button_just_pressed(MouseButton::Right) {
@@ -1072,8 +1149,9 @@ impl State {
         let brush_size = self.brush_size_slider.value();
         let from = self
             .viewport
-            .to_viewport_space(input.previous_mouse_position(), self.ui.size());
-        let to = self.viewport.to_viewport_space(input.mouse_position(), self.ui.size());
+            .to_viewport_space(input.previous_mouse_position(), canvas_size);
+        let mouse_position = input.mouse_position();
+        let to = self.viewport.to_viewport_space(mouse_position, canvas_size);
         if !self.whd.lock_painting {
             loop {
                 // give me back my labelled blocks
@@ -1088,7 +1166,7 @@ impl State {
                         stroke_width: brush_size,
                     },
                 };
-                self.paint_canvas.stroke(from, to, &brush);
+                self.paint_canvas.stroke(canvas, from, to, &brush);
                 if self.stroke_buffer.is_empty() {
                     self.stroke_buffer.push(StrokePoint {
                         point: from,
@@ -1097,6 +1175,7 @@ impl State {
                 } else if to != self.stroke_buffer.last().unwrap().point {
                     self.stroke_buffer.push(StrokePoint { point: to, brush });
                 }
+
                 break;
             }
         }
@@ -1113,8 +1192,14 @@ impl State {
         if self.panning {
             let delta_pan = input.previous_mouse_position() - input.mouse_position();
             self.viewport.pan_around(delta_pan);
+            let pan = self.viewport.pan();
+            let position = format!("{}, {}", (pan.x / 256.0).floor(), (pan.y / 256.0).floor());
+            self.show_tip(&position, Duration::from_millis(100));
         }
-        self.viewport.zoom_in(input.mouse_scroll().y);
+        if input.mouse_scroll().y != 0.0 {
+            self.viewport.zoom_in(input.mouse_scroll().y);
+            self.show_tip(&format!("{:.0}%", self.viewport.zoom() * 100.0), Duration::from_secs(3));
+        }
 
         //
         // rendering
@@ -1132,21 +1217,23 @@ impl State {
             paint.set_blend_mode(BlendMode::Difference);
 
             paint_canvas.draw_to(canvas, &self.viewport, canvas_size);
-            for (_, mate) in self.peer.mates() {
-                let cursor = mate.lerp_cursor();
-                let text_position = cursor + Point::new(mate.brush_size, mate.brush_size) * 0.5 + Point::new(0.0, 14.0);
-                paint.set_style(skpaint::Style::Fill);
-                canvas.draw_str(&mate.nickname, text_position, &self.assets.sans.borrow(), &paint);
-                paint.set_style(skpaint::Style::Stroke);
-                canvas.draw_circle(cursor, mate.brush_size * 0.5, &paint);
-            }
 
             canvas.restore();
 
-            let mouse = self.ui.mouse_position(&input);
-            paint.set_style(skpaint::Style::Stroke);
-            canvas.draw_circle(mouse, self.brush_size_slider.value() * 0.5, &paint);
+            for (_, mate) in self.peer.mates() {
+                let cursor = self.viewport.to_screen_space(mate.lerp_cursor(), canvas_size);
+                let brush_radius = mate.brush_size * self.viewport.zoom() * 0.5;
+                let text_position = cursor + Point::new(brush_radius, brush_radius) + Point::new(0.0, 14.0);
+                paint.set_style(skpaint::Style::Fill);
+                canvas.draw_str(&mate.nickname, text_position, &self.assets.sans.borrow(), &paint);
+                paint.set_style(skpaint::Style::Stroke);
+                canvas.draw_circle(cursor, brush_radius, &paint);
+            }
 
+            let zoomed_brush_size = brush_size * self.viewport.zoom();
+            paint.set_style(skpaint::Style::Stroke);
+
+            // TODO: Fix to use zoomed brush size
             if self.whd.custom_image_dims.is_some() {
                 let dims = self.whd.custom_image_dims.unwrap();
                 let x_off = match self.whd.drawing_direction {
@@ -1160,6 +1247,7 @@ impl State {
                         let ch_x_off =
                             ((input.mouse_position().x + self.viewport.pan().x) as i32 - (x_off2 * 256)).abs() as u32;
 
+                        /*
                         canvas.draw_rect(
                             Rect::from_point_and_size(
                                 ((mouse.x - x_off) - ch_x_off as f32 - 32.0, mouse.y),
@@ -1167,19 +1255,22 @@ impl State {
                             ),
                             &paint,
                         );
+                        */
                     }
                     WHDCIDrawingDirection::ToRight => {
+                        /*
                         canvas.draw_rect(
                             Rect::from_point_and_size((mouse.x - x_off as f32, mouse.y), (dims.0 as i32, dims.1 as i32)),
                             &paint,
                         );
+                        */
                     }
                 };
             }
+
+            canvas.draw_circle(mouse_position, zoomed_brush_size * 0.5, &paint);
         });
-        if self.panning {
-            let pan = self.viewport.pan();
-            let position = format!("{}, {}", (pan.x / 256.0).floor(), (pan.y / 256.0).floor());
+        if self.tip.created.elapsed() < self.tip.visible_duration {
             self.ui.push_group(self.ui.size(), Layout::Freeform);
             self.ui.pad((32.0, 32.0));
             self.ui.push_group((72.0, 62.0), Layout::Vertical);
@@ -1188,7 +1279,7 @@ impl State {
 
             self.ui.push_group((self.ui.width(), 20.0), Layout::Vertical);
             self.ui
-                .text(canvas, &position, Color::WHITE, (AlignH::Center, AlignV::Middle));
+                .text(canvas, &self.tip.text, Color::WHITE, (AlignH::Center, AlignV::Middle));
             self.ui.pop_group();
 
             self.ui.space(2.0);
@@ -1369,7 +1460,6 @@ impl State {
                 .show_save_single_file()
             {
                 Ok(Some(path)) => {
-                    self.paint_canvas.cleanup_empty_chunks();
                     self.save_to_file = Some(path);
                 }
                 Err(error) => log!(self.log, "Error while selecting file: {}", error),
@@ -1427,6 +1517,16 @@ impl AppState for State {
     ) {
         canvas.clear(Color::WHITE);
 
+        // loading from file
+
+        if self.load_from_file.is_some() {
+            ok_or_log!(
+                self.log,
+                self.paint_canvas
+                    .load_from_image_file(canvas, &self.load_from_file.take().unwrap())
+            );
+        }
+
         // network
 
         match self.peer.tick() {
@@ -1438,16 +1538,23 @@ impl AppState for State {
                             "Message::Connected shouldn't be generated after connecting to the matchmaker"
                         ),
                         Message::Left(nickname) => log!(self.log, "{} left the room", nickname),
-                        Message::Stroke(points) => Self::fellow_stroke(&mut self.paint_canvas, &points),
+                        Message::Stroke(points) => Self::fellow_stroke(canvas, &mut self.paint_canvas, &points),
                         Message::ChunkPositions(mut positions) => {
                             eprintln!("received {} chunk positions", positions.len());
+                            eprintln!("the positions are: {:?}", &positions);
                             self.server_side_chunks = positions.drain(..).collect();
                         }
                         Message::Chunks(chunks) => {
                             eprintln!("received {} chunks", chunks.len());
                             for (chunk_position, png_data) in chunks {
                                 self.whd.previous_chunk_data_timestamp = Some(SystemTime::now());
-                                Self::canvas_data(&mut self.log, &mut self.paint_canvas, chunk_position, &png_data);
+                                Self::canvas_data(
+                                    &mut self.log,
+                                    canvas,
+                                    &mut self.paint_canvas,
+                                    chunk_position,
+                                    &png_data,
+                                );
                                 self.downloaded_chunks.insert(chunk_position);
                             }
                         }
