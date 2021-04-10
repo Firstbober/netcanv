@@ -124,7 +124,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     if whd_cmd.headless_client || whd_cmd.headless_host {
         println!("Starting in headless mode");
 
-        let mut headless_canvas = skia_safe::Canvas::new_null();
+        let mut headless_surface = skia_safe::Surface::new_raster_n32_premul((1024, 600)).unwrap();
+        let mut headless_canvas = headless_surface.canvas();
 
         let mut input = Input::new();
         let mut assets = Assets::new(ColorScheme::light());
