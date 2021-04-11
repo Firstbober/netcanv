@@ -4,8 +4,8 @@ use skulpin::*;
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
-#[cfg(target_os = "linux")]
-use winit::platform::unix::WindowBuilderExtUnix;
+#[cfg(target_family = "unix")]
+use winit::platform::unix::*;
 use winit::window::WindowBuilder;
 
 mod app;
@@ -173,10 +173,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .unwrap(),
         ));
 
+        #[cfg(target_family = "unix")]
+        winit_window.set_wayland_theme(ColorScheme::light());
+
         let window = WinitWindow::new(&winit_window);
         let mut renderer = RendererBuilder::new().use_vulkan_debug_layer(false).build(&window)?;
 
-        let mut assets = Assets::new(ColorScheme::whd_dark());
+        let mut assets = Assets::new(ColorScheme::light());
         assets.whd_add_commandline(whd_cmd);
         let mut app: Option<Box<dyn AppState>> = Some(Box::new(lobby::State::new(assets, None)) as _);
         let mut input = Input::new();

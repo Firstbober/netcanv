@@ -1,8 +1,6 @@
-use std::borrow::Borrow;
-
 use skulpin::skia_safe::*;
 
-use crate::{wallhackd};
+use crate::wallhackd;
 
 use crate::ui::{ButtonColors, ExpandColors, ExpandIcons, TextFieldColors};
 use crate::util::{new_rc_font, RcFont};
@@ -15,6 +13,8 @@ const CHEVRON_DOWN_SVG: &[u8] = include_bytes!("assets/icons/chevron-down.svg");
 const INFO_SVG: &[u8] = include_bytes!("assets/icons/info.svg");
 const ERROR_SVG: &[u8] = include_bytes!("assets/icons/error.svg");
 const SAVE_SVG: &[u8] = include_bytes!("assets/icons/save.svg");
+const DARK_MODE_SVG: &[u8] = include_bytes!("assets/icons/dark-mode.svg");
+const LIGHT_MODE_SVG: &[u8] = include_bytes!("assets/icons/light-mode.svg");
 
 // [WHD]
 
@@ -39,7 +39,7 @@ const PERSON_PIN_CIRCLE: &[u8] = include_bytes!("assets/icons/person-pin-circle.
 
 pub enum ColorSchemeType {
     Light,
-    Dark
+    Dark,
 }
 
 pub struct ColorScheme {
@@ -55,7 +55,7 @@ pub struct ColorScheme {
     pub slider: Color,
     pub text_field: TextFieldColors,
 
-    pub scheme_type: ColorSchemeType
+    pub titlebar: TitlebarColors,
 }
 
 pub struct StatusIcons {
@@ -83,14 +83,21 @@ pub struct WHDIcons {
     pub close: Image,
     pub palette: Image,
     pub message: Image,
-    pub person_pin_circle: Image
+    pub person_pin_circle: Image,
+}
+
+pub struct ColorSwitcherIcons {
+    pub dark: Image,
+    pub light: Image,
 }
 
 pub struct Icons {
     pub expand: ExpandIcons,
     pub status: StatusIcons,
     pub file: FileIcons,
-    pub whd: WHDIcons
+
+    pub whd: WHDIcons,
+    pub color_switcher: ColorSwitcherIcons,
 }
 
 pub struct Assets {
@@ -100,7 +107,8 @@ pub struct Assets {
     pub colors: ColorScheme,
     pub icons: Icons,
 
-    pub whd_commandline: wallhackd::WHDCommandLine
+    pub whd_commandline: wallhackd::WHDCommandLine,
+    pub dark_mode: bool,
 }
 
 impl Assets {
@@ -158,8 +166,12 @@ impl Assets {
                     close: Self::load_icon(CLOSE),
                     palette: Self::load_icon(PALETTE),
                     message: Self::load_icon(MESSAGE),
-                    person_pin_circle: Self::load_icon(PERSON_PIN_CIRCLE)
-                }
+                    person_pin_circle: Self::load_icon(PERSON_PIN_CIRCLE),
+                },
+                color_switcher: ColorSwitcherIcons {
+                    dark: Self::load_icon(DARK_MODE_SVG),
+                    light: Self::load_icon(LIGHT_MODE_SVG),
+                },
             },
 
             whd_commandline: wallhackd::WHDCommandLine {
@@ -172,7 +184,9 @@ impl Assets {
 
                 save_canvas: None,
                 load_canvas: None,
-            }
+            },
+
+            dark_mode: false,
         }
     }
     pub fn whd_add_commandline(&mut self, cmd: wallhackd::WHDCommandLine) {
@@ -199,7 +213,7 @@ impl ColorScheme {
                 pressed: Color::new(0x50000000),
 
                 whd_tooltip_bg: tooltip_bg,
-                whd_tooltip_text: tooltip_text
+                whd_tooltip_text: tooltip_text,
             },
             tool_button: ButtonColors {
                 outline: Color::new(0x00000000),
@@ -208,7 +222,7 @@ impl ColorScheme {
                 pressed: Color::new(0x50000000),
 
                 whd_tooltip_bg: tooltip_bg,
-                whd_tooltip_text: tooltip_text
+                whd_tooltip_text: tooltip_text,
             },
             slider: Color::new(0xff000000),
             expand: ExpandColors {
@@ -225,59 +239,119 @@ impl ColorScheme {
                 text_hint: Color::new(0x7f000000),
                 label: Color::new(0xff000000),
             },
+            titlebar: TitlebarColors {
+                titlebar: Color::new(0xffffffff),
+                separator: Color::new(0x7f000000),
+                text: Color::new(0xff000000),
 
-            scheme_type: ColorSchemeType::Light
+                foreground_hover: Color::new(0xffeeeeee),
+                button: Color::new(0xff000000),
+            },
         }
     }
 
-    pub fn whd_dark() -> Self {
-        let accent = 0xffF57C00;
-
-        let tooltip_bg = Color::new(0xfff2f2ec);
-        let tooltip_text = Color::new(0xc50f1214);
-
+    pub fn dark() -> Self {
         Self {
-            text: Color::new(0xfff2f2ec),
-            panel: Color::new(0xc50f1214),
+            text: Color::new(0xffb7b7b7),
+            panel: Color::new(0xff1f1f1f),
             panel2: Color::new(0xffffffff),
-            separator: Color::new(0xffFF5722),
-            error: Color::new(0xffF44336),
+            separator: Color::new(0xff202020),
+            error: Color::new(0xfffc9292),
 
             button: ButtonColors {
-                outline: Color::new(accent),
-                text: Color::new(accent),
-                hover: Color::new(0x30ffffff),
-                pressed: Color::new(0x60000000),
-
-                whd_tooltip_bg: tooltip_bg,
-                whd_tooltip_text: tooltip_text
+                outline: Color::new(0xff444444),
+                text: Color::new(0xffd2d2d2),
+                hover: Color::new(0x20ffffff),
+                pressed: Color::new(0x10ffffff),
+                whd_tooltip_bg: Color::new(0xffb7b7b7),
+                whd_tooltip_text: Color::new(0xff1f1f1f),
             },
             tool_button: ButtonColors {
                 outline: Color::new(0x00000000),
-                text: Color::new(0xfff2f2ec),
-                hover: Color::new(0x30ffffff),
-                pressed: Color::new(0x60000000),
-
-                whd_tooltip_bg: tooltip_bg,
-                whd_tooltip_text: tooltip_text
+                text: Color::new(0xffb7b7b7),
+                hover: Color::new(0x20ffffff),
+                pressed: Color::new(0x10ffffff),
+                whd_tooltip_bg: Color::new(0xffb7b7b7),
+                whd_tooltip_text: Color::new(0xff1f1f1f),
             },
-            slider: Color::new(accent),
+            slider: Color::new(0xff979797),
             expand: ExpandColors {
-                icon: Color::new(accent),
-                text: Color::new(0xfff2f2ec),
-                hover: Color::new(accent),
-                pressed: Color::new(0x60000000),
+                icon: Color::new(0xffb7b7b7),
+                text: Color::new(0xffb7b7b7),
+                hover: Color::new(0x60ffffff),
+                pressed: Color::new(0x30ffffff),
             },
             text_field: TextFieldColors {
-                outline: Color::new(0xff3b3f44),
-                outline_focus: Color::new(0xffd4d4d4),
-                fill: Color::new(0xff191b1f),
-                text: Color::new(0xfff2f2ec),
-                text_hint: Color::new(0xffbababa),
-                label: Color::new(0xfff2f2ec),
+                outline: Color::new(0xff595959),
+                outline_focus: Color::new(0xff9a9a9a),
+                fill: Color::new(0xff383838),
+                text: Color::new(0xffd5d5d5),
+                text_hint: Color::new(0x7f939393),
+                label: Color::new(0xffd5d5d5),
             },
+            titlebar: TitlebarColors {
+                titlebar: Color::new(0xff383838),
+                separator: Color::new(0x7f939393),
+                text: Color::new(0xffd5d5d5),
 
-            scheme_type: ColorSchemeType::Dark
+                foreground_hover: Color::new(0xff1f1f1f),
+                button: Color::new(0xffb7b7b7),
+            },
+        }
+    }
+}
+
+pub struct TitlebarColors {
+    pub titlebar: Color,
+    pub separator: Color,
+    pub text: Color,
+
+    pub foreground_hover: Color,
+    pub button: Color,
+}
+
+#[cfg(target_family = "unix")]
+use winit::platform::unix::*;
+
+#[cfg(target_family = "unix")]
+fn winit_argb_from_skia_color(color: Color) -> ARGBColor {
+    ARGBColor {
+        a: color.a(),
+        r: color.r(),
+        g: color.g(),
+        b: color.b(),
+    }
+}
+
+#[cfg(target_family = "unix")]
+impl Theme for ColorScheme {
+    fn element_color(&self, element: Element, window_active: bool) -> ARGBColor {
+        match element {
+            Element::Bar => winit_argb_from_skia_color(self.titlebar.titlebar),
+            Element::Separator => winit_argb_from_skia_color(self.titlebar.separator),
+            Element::Text => winit_argb_from_skia_color(self.titlebar.text),
+        }
+    }
+
+    fn button_color(&self, button: Button, state: ButtonState, foreground: bool, _window_active: bool) -> ARGBColor {
+        let color = match button {
+            Button::Close => winit_argb_from_skia_color(self.error),
+            Button::Maximize => winit_argb_from_skia_color(self.titlebar.button),
+            Button::Minimize => winit_argb_from_skia_color(self.titlebar.button),
+        };
+
+        if foreground {
+            if state == ButtonState::Hovered {
+                return winit_argb_from_skia_color(self.titlebar.foreground_hover);
+            } else {
+                return winit_argb_from_skia_color(self.titlebar.text);
+            }
+        }
+
+        match state {
+            ButtonState::Disabled => winit_argb_from_skia_color(self.titlebar.separator),
+            ButtonState::Hovered => color,
+            ButtonState::Idle => winit_argb_from_skia_color(self.titlebar.titlebar),
         }
     }
 }

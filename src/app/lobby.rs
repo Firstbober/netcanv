@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use native_dialog::FileDialog;
 use skulpin::skia_safe::*;
 
-use crate::{app::{paint, AppState, StateArgs}, assets::{ColorScheme, ColorSchemeType}, wallhackd::{self, WHDLobbyFunctions}};
-use crate::assets::Assets;
+use crate::{app::{paint, AppState, StateArgs}, wallhackd::{self, WHDLobbyFunctions}};
+use crate::assets::{Assets, ColorScheme};
 use crate::net::{Message, Peer};
 use crate::ui::*;
 use crate::util::get_window_size;
@@ -20,7 +20,7 @@ enum Status {
     Error(String),
 }
 
-impl<T: Error + Display> From<T> for Status {
+impl<T: Display> From<T> for Status {
     fn from(error: T) -> Self {
         Self::Error(format!("{}", error))
     }
@@ -243,22 +243,6 @@ impl wallhackd::WHDLobbyFunctions for State {
     }
 
     fn whd_process_right_bar(&mut self, canvas: &mut Canvas, input: &Input) {
-        if Button::with_icon_and_tooltip(&mut self.ui, canvas, input, ButtonArgs {
-            height: 32.0,
-            colors: &self.assets.colors.tool_button,
-        }, match self.assets.colors.scheme_type {
-            crate::assets::ColorSchemeType::Dark => &self.assets.icons.whd.light_mode,
-            crate::assets::ColorSchemeType::Light => &self.assets.icons.whd.dark_mode,
-        }, match self.assets.colors.scheme_type {
-            crate::assets::ColorSchemeType::Dark => "Change to light mode".to_owned(),
-            crate::assets::ColorSchemeType::Light => "Change to dark mode".to_owned(),
-        }, WHDTooltipPos::Left).clicked() {
-            match self.assets.colors.scheme_type {
-                ColorSchemeType::Dark => self.assets.colors = ColorScheme::light(),
-                ColorSchemeType::Light => self.assets.colors = ColorScheme::whd_dark()
-            };
-        }
-
         self.ui.space(6.0);
 
         if Button::with_icon_and_tooltip(
@@ -460,6 +444,7 @@ impl State {
                     .add_filter("Supported image files", &[
                         "png", "jpg", "jpeg", "jfif", "gif", "bmp", "tif", "tiff", "webp", "avif", "pnm", "tga",
                     ])
+                    .add_filter("NetCanv canvas", &["toml"])
                     .show_open_single_file()
                 {
                     Ok(Some(path)) => {
@@ -633,7 +618,34 @@ impl AppState for State {
 
         self.ui.push_group((32.0, self.ui.height()), Layout::Vertical);
         self.ui.align((AlignH::Right, AlignV::Top));
+
+        if Button::with_icon(
+            &mut self.ui,
+            canvas,
+            input,
+            ButtonArgs {
+                height: 32.0,
+                colors: &self.assets.colors.tool_button,
+            },
+            if self.assets.dark_mode {
+                &self.assets.icons.color_switcher.light
+            } else {
+                &self.assets.icons.color_switcher.dark
+            },
+        )
+        .clicked()
+        {
+            self.assets.dark_mode = !self.assets.dark_mode;
+
+            if self.assets.dark_mode {
+                self.assets.colors = ColorScheme::dark();
+            } else {
+                self.assets.colors = ColorScheme::light();
+            }
+        }
+
         self.whd_process_right_bar(canvas, input);
+
         self.ui.pop_group();
     }
 

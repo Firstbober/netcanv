@@ -1125,8 +1125,8 @@ dependencies = [
  "resvg",
  "serde",
  "skulpin",
- "thiserror",
  "tiny-skia",
+ "toml",
  "usvg",
  "winit",
 ]
