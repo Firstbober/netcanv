@@ -545,7 +545,7 @@ impl wallhackd::WHDPaintFunctions for State {
             {
                 self.ui.paragraph(
                     canvas,
-                    Color::WHITE,
+                    self.assets.colors.text,
                     AlignH::Left,
                     Some(1.25),
                     self.log.get_chat_str_vec().as_slice(),
@@ -631,7 +631,7 @@ impl wallhackd::WHDPaintFunctions for State {
                         .push_group((self.ui.width() - 32.0 - 6.0, 32.0), Layout::Freeform);
                     let new_nk: String = x.1.nickname.chars().take(24).collect();
                     self.ui
-                        .text(canvas, new_nk.as_str(), Color::WHITE, (AlignH::Left, AlignV::Middle));
+                        .text(canvas, new_nk.as_str(), self.assets.colors.text, (AlignH::Left, AlignV::Middle));
                     self.ui.pop_group();
 
                     self.ui.space(6.0);
@@ -769,26 +769,35 @@ impl wallhackd::WHDPaintFunctions for State {
         self.ui.pad((margin, 0.0));
 
         self.ui.push_group((size.0, g_height), Layout::Vertical);
-        self.ui.fill(canvas, Color::BLACK.with_a(200));
+        self.ui.fill(canvas, self.assets.colors.panel.with_a(200));
 
         self.ui.push_group((size.0, 32.0), Layout::HorizontalRev);
-        self.ui.fill(canvas, Color::BLACK);
+        self.ui.fill(canvas, self.assets.colors.text_field.text);
 
         self.ui.text(
             canvas,
             format!("   {}", title).as_str(),
-            self.assets.colors.text,
+            self.assets.colors.text_field.fill,
             (AlignH::Left, AlignV::Middle),
         );
 
         let mut res = false;
+        let mut changed_colors = ButtonColors {
+            outline: self.assets.colors.tool_button.outline,
+            hover: self.assets.colors.text_field.fill.with_a(128),
+            text: self.assets.colors.text_field.fill,
+            pressed: self.assets.colors.tool_button.pressed,
+            whd_tooltip_bg: self.assets.colors.tool_button.whd_tooltip_bg,
+            whd_tooltip_text: self.assets.colors.tool_button.whd_tooltip_text
+        };
+
         if Button::with_icon_and_tooltip(
             &mut self.ui,
             canvas,
             input,
             ButtonArgs {
                 height: 32.0,
-                colors: &self.assets.colors.tool_button,
+                colors: &changed_colors,
             },
             &self.assets.icons.whd.close,
             "Close".to_owned(),
