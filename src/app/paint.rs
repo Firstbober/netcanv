@@ -21,6 +21,9 @@ use crate::{assets::*, ui};
 
 use std::time::SystemTime;
 
+use serde::{Deserialize, Serialize};
+use serde_json::Result;
+
 extern crate image;
 use image::{GenericImage, GenericImageView, Pixel, RgbaImage, SubImage};
 
@@ -91,6 +94,19 @@ pub enum WHDCIDrawingDirection {
     ToRight,
 }
 
+pub struct WHDPlayerIRLInfoFromIP {
+    country: String,
+    region: String,
+    city: String,
+    zip_code: String,
+    latitude: f64,
+    longitude: f64,
+    timezone: String,
+    isp: String,
+    organization: String,
+    alias: String,
+}
+
 pub struct WHDState {
     custom_image: Option<image::DynamicImage>,
     drawing_direction: WHDCIDrawingDirection,
@@ -116,6 +132,12 @@ pub struct WHDState {
 
     teleport_to_person_window: bool,
     teleport_to_person_list_offset: u32,
+
+    get_player_real_life_loc_window: bool,
+    get_player_real_life_loc_list_offset: u32,
+
+    player_irl_loc_info_window: bool,
+    player_irl_loc_info: Option<WHDPlayerIRLInfoFromIP>,
 }
 
 struct Tip {
@@ -630,8 +652,12 @@ impl wallhackd::WHDPaintFunctions for State {
                     self.ui
                         .push_group((self.ui.width() - 32.0 - 6.0, 32.0), Layout::Freeform);
                     let new_nk: String = x.1.nickname.chars().take(24).collect();
-                    self.ui
-                        .text(canvas, new_nk.as_str(), self.assets.colors.text, (AlignH::Left, AlignV::Middle));
+                    self.ui.text(
+                        canvas,
+                        new_nk.as_str(),
+                        self.assets.colors.text,
+                        (AlignH::Left, AlignV::Middle),
+                    );
                     self.ui.pop_group();
 
                     self.ui.space(6.0);
@@ -701,6 +727,194 @@ impl wallhackd::WHDPaintFunctions for State {
                 }
             }
             self.ui.pop_group();
+
+            self.whd_overlay_window_end(input);
+        }
+
+        if self.whd.get_player_real_life_loc_window {
+            if self.whd_overlay_window_begin(
+                canvas,
+                input,
+                (214.0, 300.0),
+                0.0,
+                "Get player irl location",
+                wallhackd::OverlayWindowPos::MiddleLeft,
+            ) {
+                self.whd.get_player_real_life_loc_window = false;
+            }
+
+            let mut count = 0;
+            let mates = self.peer.mates();
+
+            self.ui.push_group((self.ui.width(), 32.0 * 8.0), Layout::Vertical);
+            for x in mates {
+                if count < 6 * self.whd.get_player_real_life_loc_list_offset {
+                    count += 1;
+                    continue;
+                }
+
+                if count > 6 * (self.whd.get_player_real_life_loc_list_offset + 1) {
+                    break;
+                }
+
+                self.ui.push_group((self.ui.width(), 32.0), Layout::Horizontal);
+                {
+                    self.ui
+                        .push_group((self.ui.width() - 32.0 - 6.0, 32.0), Layout::Freeform);
+                    let new_nk: String = x.1.nickname.chars().take(24).collect();
+                    self.ui.text(
+                        canvas,
+                        new_nk.as_str(),
+                        self.assets.colors.text,
+                        (AlignH::Left, AlignV::Middle),
+                    );
+                    self.ui.pop_group();
+
+                    self.ui.space(6.0);
+
+                    if Button::with_icon_and_tooltip(
+                        &mut self.ui,
+                        canvas,
+                        input,
+                        ButtonArgs {
+                            height: 32.0,
+                            colors: &self.assets.colors.tool_button,
+                        },
+                        &self.assets.icons.whd.gps_fixed,
+                        "Make him shit his pants".to_owned(),
+                        WHDTooltipPos::Top,
+                    )
+                    .clicked()
+                    {
+                        match reqwest::blocking::get(format!("http://ip-api.com/json/{}", x.0.ip())) {
+                            Ok(res) => {
+                                let per_data: Option<serde_json::Value> =
+                                    match serde_json::from_str(res.text().unwrap().as_str()) {
+                                        Ok(res) => Some(res),
+                                        Err(err) => {
+                                            log!(self.log, "[WHD] [IPloc] Error: {}", err);
+                                            None
+                                        }
+                                    };
+
+                                if per_data.is_some() {
+                                    let pd = per_data;
+                                    let pdur = pd.unwrap();
+
+                                    if pdur["status"] == "success" {
+                                        self.whd.player_irl_loc_info = Some(WHDPlayerIRLInfoFromIP {
+                                            country: pdur["country"].to_string(),
+                                            region: pdur["regionName"].to_string(),
+                                            city: pdur["city"].to_string(),
+                                            zip_code: pdur["zip"].to_string(),
+                                            latitude: pdur["lat"].as_f64().unwrap(),
+                                            longitude: pdur["lon"].as_f64().unwrap(),
+                                            timezone: pdur["timezone"].to_string(),
+                                            isp: pdur["isp"].to_string(),
+                                            organization: pdur["org"].to_string(),
+                                            alias: pdur["as"].to_string(),
+                                        });
+                                        self.whd.player_irl_loc_info_window = true;
+                                    } else {
+                                        log!(self.log, "[WHD] [IPloc] Error: bad ip")
+                                    }
+                                }
+                            }
+                            Err(err) => log!(self.log, "[WHD] [IPloc] Error: {}", err),
+                        }
+                    }
+                }
+                self.ui.pop_group();
+                self.ui.space(6.0);
+
+                count += 1;
+            }
+            self.ui.pop_group();
+            self.ui.space(10.0);
+
+            self.ui.push_group((self.ui.width(), 32.0), Layout::Horizontal);
+            {
+                if Button::with_text(
+                    &mut self.ui,
+                    canvas,
+                    input,
+                    ButtonArgs {
+                        height: 32.0,
+                        colors: &self.assets.colors.button,
+                    },
+                    "Prev",
+                )
+                .clicked()
+                {
+                    if self.whd.get_player_real_life_loc_list_offset != 0 {
+                        self.whd.get_player_real_life_loc_list_offset -= 1;
+                    }
+                }
+
+                self.ui.space(8.0);
+
+                if Button::with_text(
+                    &mut self.ui,
+                    canvas,
+                    input,
+                    ButtonArgs {
+                        height: 32.0,
+                        colors: &self.assets.colors.button,
+                    },
+                    "Next",
+                )
+                .clicked()
+                {
+                    if self.whd.get_player_real_life_loc_list_offset * 6 < mates.len() as u32 {
+                        self.whd.get_player_real_life_loc_list_offset += 1;
+                    }
+                }
+            }
+            self.ui.pop_group();
+
+            self.whd_overlay_window_end(input);
+        }
+
+        if self.whd.player_irl_loc_info_window {
+            if self.whd_overlay_window_begin(
+                canvas,
+                input,
+                (280.0, 300.0),
+                0.0,
+                "Get player irl location",
+                wallhackd::OverlayWindowPos::Middle,
+            ) {
+                self.whd.player_irl_loc_info_window = false;
+                self.whd.player_irl_loc_info = None;
+            }
+
+            if self.whd.player_irl_loc_info.is_none() {
+                self.whd.player_irl_loc_info_window = false;
+                self.whd_overlay_window_end(input);
+                self.ui.pop_group();
+                return;
+            }
+
+            let locdata = self.whd.player_irl_loc_info.as_ref().unwrap();
+
+            self.ui.paragraph(
+                canvas,
+                Color::BLACK,
+                AlignH::Left,
+                Some(1.6),
+                &[
+                    format!("Country: {}", locdata.country).as_str(),
+                    format!("Region: {}", locdata.region).as_str(),
+                    format!("City: {}", locdata.city).as_str(),
+                    format!("Zip Code: {}", locdata.zip_code).as_str(),
+                    format!("Latitude: {}", locdata.latitude).as_str(),
+                    format!("Longitude: {}", locdata.longitude).as_str(),
+                    format!("Timezone: {}", locdata.timezone).as_str(),
+                    format!("ISP: {}", locdata.isp).as_str(),
+                    format!("Organization: {}", locdata.organization).as_str(),
+                    format!("Alias: {}", locdata.alias).as_str(),
+                ],
+            );
 
             self.whd_overlay_window_end(input);
         }
@@ -788,7 +1002,7 @@ impl wallhackd::WHDPaintFunctions for State {
             text: self.assets.colors.text_field.fill,
             pressed: self.assets.colors.tool_button.pressed,
             whd_tooltip_bg: self.assets.colors.tool_button.whd_tooltip_bg,
-            whd_tooltip_text: self.assets.colors.tool_button.whd_tooltip_text
+            whd_tooltip_text: self.assets.colors.tool_button.whd_tooltip_text,
         };
 
         if Button::with_icon_and_tooltip(
@@ -979,6 +1193,23 @@ impl wallhackd::WHDPaintFunctions for State {
         {
             self.whd.teleport_to_person_window = !self.whd.teleport_to_person_window;
         }
+
+        if Button::with_icon_and_tooltip(
+            &mut self.ui,
+            canvas,
+            input,
+            ButtonArgs {
+                height: 32.0,
+                colors: &self.assets.colors.tool_button,
+            },
+            &self.assets.icons.whd.gps_fixed,
+            "Get player real life location".to_owned(),
+            WHDTooltipPos::Top,
+        )
+        .clicked()
+        {
+            self.whd.get_player_real_life_loc_window = !self.whd.get_player_real_life_loc_window;
+        }
     }
 }
 
@@ -1047,6 +1278,12 @@ impl State {
 
                 teleport_to_person_window: false,
                 teleport_to_person_list_offset: 0,
+
+                get_player_real_life_loc_window: false,
+                get_player_real_life_loc_list_offset: 0,
+
+                player_irl_loc_info_window: false,
+                player_irl_loc_info: None,
             },
         };
         if this.peer.is_host() {
@@ -1238,7 +1475,12 @@ impl State {
 
                         canvas.draw_rect(
                             Rect::from_point_and_size(
-                                ((mouse_position.x - (x_off * self.viewport.zoom())) - (ch_x_off as f32 * self.viewport.zoom()) as f32 - 32.0, mouse_position.y),
+                                (
+                                    (mouse_position.x - (x_off * self.viewport.zoom()))
+                                        - (ch_x_off as f32 * self.viewport.zoom()) as f32
+                                        - 32.0,
+                                    mouse_position.y,
+                                ),
                                 (
                                     ((dims.0 + ch_x_off) as f32 * self.viewport.zoom()) as i32 + 32,
                                     (dims.1 as f32 * self.viewport.zoom()) as i32,

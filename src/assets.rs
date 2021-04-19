@@ -34,6 +34,7 @@ const CLOSE: &[u8] = include_bytes!("assets/icons/close.svg");
 const PALETTE: &[u8] = include_bytes!("assets/icons/palette.svg");
 const MESSAGE: &[u8] = include_bytes!("assets/icons/message.svg");
 const PERSON_PIN_CIRCLE: &[u8] = include_bytes!("assets/icons/person-pin-circle.svg");
+const GPS_FIXED: &[u8] = include_bytes!("assets/icons/gps_fixed.svg");
 
 // [WHD]
 
@@ -84,6 +85,7 @@ pub struct WHDIcons {
     pub palette: Image,
     pub message: Image,
     pub person_pin_circle: Image,
+    pub gps_fixed: Image
 }
 
 pub struct ColorSwitcherIcons {
@@ -167,6 +169,7 @@ impl Assets {
                     palette: Self::load_icon(PALETTE),
                     message: Self::load_icon(MESSAGE),
                     person_pin_circle: Self::load_icon(PERSON_PIN_CIRCLE),
+                    gps_fixed: Self::load_icon(GPS_FIXED)
                 },
                 color_switcher: ColorSwitcherIcons {
                     dark: Self::load_icon(DARK_MODE_SVG),
