@@ -33,7 +33,9 @@ pub struct WHDState {
     last_status_text: String,
 
     headless_trying_to_host: bool,
-    headless_trying_to_join: bool
+    headless_trying_to_join: bool,
+
+    whd_accent: u8,
 }
 
 pub struct State {
@@ -252,7 +254,26 @@ impl wallhackd::WHDLobbyFunctions for State {
             }, &self.assets.icons.whd.wallhackd,
             "WallhackD".to_owned(),
             WHDTooltipPos::Left
-        ).clicked() {}
+        ).clicked() {
+            self.whd.whd_accent += 1;
+
+            if self.whd.whd_accent > 5 {
+                self.whd.whd_accent = 0
+            }
+
+            if self.whd.whd_accent > 0 {
+                self.assets.colors = match self.whd.whd_accent {
+                    1 => ColorScheme::whd_accent(Color::new(0xffF44336), Color::new(0xff1d1616)),
+                    2 => ColorScheme::whd_accent(Color::new(0xffFF5722), Color::new(0xff1c1615)),
+                    3 => ColorScheme::whd_accent(Color::new(0xff8BC34A), Color::new(0xff181a16)),
+                    4 => ColorScheme::whd_accent(Color::new(0xff2196F3), Color::new(0xff15181b)),
+                    5 => ColorScheme::whd_accent(Color::new(0xffFFEB3B), Color::new(0xff1e1d16)),
+                    _ => ColorScheme::whd_accent(Color::new(0xff3F51B5), Color::new(0xff121517))
+                }
+            } else {
+                self.assets.colors = ColorScheme::dark();
+            }
+        }
     }
 }
 
@@ -287,6 +308,8 @@ impl State {
 
                 headless_trying_to_host: false,
                 headless_trying_to_join: false,
+
+                whd_accent: 0
             }
         }
     }

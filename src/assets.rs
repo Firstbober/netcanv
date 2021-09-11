@@ -306,6 +306,82 @@ impl ColorScheme {
     }
 }
 
+fn darken_color(color: Color, amount: f32) -> Color {
+    Color::from_rgb(
+        (color.r() as f32 * amount).round() as u8,
+        (color.g() as f32 * amount).round() as u8,
+        (color.b() as f32 * amount).round() as u8
+    )
+}
+
+fn lighten_color(color: Color, amount: f32) -> Color {
+    Color::from_rgb(
+        color.r() + ((255 - color.r()) as f32 * amount).round() as u8,
+        color.g() + ((255 - color.g()) as f32 * amount).round() as u8,
+        color.b() + ((255 - color.b()) as f32 * amount).round() as u8
+    )
+}
+
+impl ColorScheme {
+    pub fn whd_accent(accent: Color, bg: Color) -> Self {
+        let accent = accent;
+        let secondary_accent = lighten_color(accent, 0.20);
+
+        let bg = bg;
+        let fg = Color::new(0xfffafafa);
+
+        Self {
+            text: fg,
+            panel: bg,
+            panel2: Color::new(0xffffffff),
+            separator: Color::new(0xff202020),
+            error: accent,
+
+            button: ButtonColors {
+                outline: accent,
+                text: fg,
+                hover: accent.with_a(20),
+                pressed: accent.with_a(10),
+
+                whd_tooltip_bg: accent,
+                whd_tooltip_text: fg,
+            },
+            tool_button: ButtonColors {
+                outline: Color::new(0x00000000),
+                text: fg,
+                hover: Color::new(0x10ffffff),
+                pressed: Color::new(0x05ffffff),
+
+                whd_tooltip_bg: accent,
+                whd_tooltip_text: fg,
+            },
+            slider: secondary_accent,
+            expand: ExpandColors {
+                icon: darken_color(accent, 0.80),
+                text: fg,
+                hover: darken_color(accent, 0.65),
+                pressed: darken_color(accent, 0.85),
+            },
+            text_field: TextFieldColors {
+                outline: darken_color(accent, 0.65),
+                outline_focus: secondary_accent,
+                fill: darken_color(accent, 0.50).with_a(50),
+                text: fg,
+                text_hint: secondary_accent.with_a(90),
+                label: fg,
+            },
+            titlebar: TitlebarColors {
+                titlebar: bg,
+                separator: Color::new(0x7fc8c8c8),
+                text: fg,
+
+                foreground_hover: Color::new(0xff1f1f1f),
+                button: Color::new(0xffb7b7b7),
+            },
+        }
+    }
+}
+
 pub struct TitlebarColors {
     pub titlebar: Color,
     pub separator: Color,
