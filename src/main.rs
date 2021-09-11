@@ -142,7 +142,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if whd_cmd.matchmaker_addr.is_some() {
-        config.lobby.nickname = whd_cmd.matchmaker_addr.clone().unwrap();
+        config.lobby.matchmaker = whd_cmd.matchmaker_addr.clone().unwrap();
     }
 
     let mut assets = Assets::new(color_scheme);
