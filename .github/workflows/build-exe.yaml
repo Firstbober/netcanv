@@ -2,9 +2,9 @@ name: Build Windows executable
 
 on:
   push:
-    branches: [master]
+    branches: [wallhackd]
   pull_request:
-    branches: [master]
+    branches: [wallhackd]
 
 env:
   CARGO_TERM_COLOR: always
