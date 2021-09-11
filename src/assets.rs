@@ -1,9 +1,8 @@
 use skulpin::skia_safe::*;
 
-use crate::wallhackd;
-
 use crate::ui::{ButtonColors, ExpandColors, ExpandIcons, TextFieldColors};
 use crate::util::{new_rc_font, RcFont};
+use crate::wallhackd;
 
 const SANS_TTF: &[u8] = include_bytes!("assets/fonts/Barlow-Medium.ttf");
 const SANS_BOLD_TTF: &[u8] = include_bytes!("assets/fonts/Barlow-Bold.ttf");
@@ -85,7 +84,7 @@ pub struct WHDIcons {
     pub palette: Image,
     pub message: Image,
     pub person_pin_circle: Image,
-    pub gps_fixed: Image
+    pub gps_fixed: Image,
 }
 
 pub struct ColorSwitcherIcons {
@@ -169,7 +168,7 @@ impl Assets {
                     palette: Self::load_icon(PALETTE),
                     message: Self::load_icon(MESSAGE),
                     person_pin_circle: Self::load_icon(PERSON_PIN_CIRCLE),
-                    gps_fixed: Self::load_icon(GPS_FIXED)
+                    gps_fixed: Self::load_icon(GPS_FIXED),
                 },
                 color_switcher: ColorSwitcherIcons {
                     dark: Self::load_icon(DARK_MODE_SVG),
@@ -192,6 +191,7 @@ impl Assets {
             dark_mode: false,
         }
     }
+
     pub fn whd_add_commandline(&mut self, cmd: wallhackd::WHDCommandLine) {
         self.whd_commandline = cmd;
     }
@@ -310,7 +310,7 @@ fn darken_color(color: Color, amount: f32) -> Color {
     Color::from_rgb(
         (color.r() as f32 * amount).round() as u8,
         (color.g() as f32 * amount).round() as u8,
-        (color.b() as f32 * amount).round() as u8
+        (color.b() as f32 * amount).round() as u8,
     )
 }
 
@@ -318,17 +318,31 @@ fn lighten_color(color: Color, amount: f32) -> Color {
     Color::from_rgb(
         color.r() + ((255 - color.r()) as f32 * amount).round() as u8,
         color.g() + ((255 - color.g()) as f32 * amount).round() as u8,
-        color.b() + ((255 - color.b()) as f32 * amount).round() as u8
+        color.b() + ((255 - color.b()) as f32 * amount).round() as u8,
+    )
+}
+
+fn lerp(v0: f32, v1: f32, t: f32) -> f32 {
+    v0 + t * (v1 - v0)
+}
+
+fn blend_colors(c1: Color, c2: Color, t: f32) -> Color {
+    Color::from_argb(
+        (lerp(c1.a() as f32 / 255.0, c2.a() as f32 / 255.0, t) * 255.0).round() as u8,
+        (lerp(c1.r() as f32 / 255.0, c2.r() as f32 / 255.0, t) * 255.0).round() as u8,
+        (lerp(c1.g() as f32 / 255.0, c2.g() as f32 / 255.0, t) * 255.0).round() as u8,
+        (lerp(c1.b() as f32 / 255.0, c2.b() as f32 / 255.0, t) * 255.0).round() as u8,
     )
 }
 
 impl ColorScheme {
-    pub fn whd_accent(accent: Color, bg: Color) -> Self {
+    pub fn whd_accent(accent: Color) -> Self {
         let accent = accent;
         let secondary_accent = lighten_color(accent, 0.20);
 
-        let bg = bg;
+        //let bg = bg;
         let fg = Color::new(0xfffafafa);
+        let bg = blend_colors(Color::new(0xff151515), accent, 0.05);
 
         Self {
             text: fg,
@@ -423,9 +437,9 @@ impl Theme for ColorScheme {
 
         if foreground {
             if state == ButtonState::Hovered {
-                return winit_argb_from_skia_color(self.titlebar.foreground_hover);
+                return winit_argb_from_skia_color(self.titlebar.foreground_hover)
             } else {
-                return winit_argb_from_skia_color(self.titlebar.text);
+                return winit_argb_from_skia_color(self.titlebar.text)
             }
         }
 

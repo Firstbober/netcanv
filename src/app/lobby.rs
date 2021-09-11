@@ -263,12 +263,12 @@ impl wallhackd::WHDLobbyFunctions for State {
 
             if self.whd.whd_accent > 0 {
                 self.assets.colors = match self.whd.whd_accent {
-                    1 => ColorScheme::whd_accent(Color::new(0xffF44336), Color::new(0xff1d1616)),
-                    2 => ColorScheme::whd_accent(Color::new(0xffFF5722), Color::new(0xff1c1615)),
-                    3 => ColorScheme::whd_accent(Color::new(0xff8BC34A), Color::new(0xff181a16)),
-                    4 => ColorScheme::whd_accent(Color::new(0xff2196F3), Color::new(0xff15181b)),
-                    5 => ColorScheme::whd_accent(Color::new(0xffFFEB3B), Color::new(0xff1e1d16)),
-                    _ => ColorScheme::whd_accent(Color::new(0xff3F51B5), Color::new(0xff121517))
+                    1 => ColorScheme::whd_accent(Color::new(0xffF44336)),
+                    2 => ColorScheme::whd_accent(Color::new(0xffFF5722)),
+                    3 => ColorScheme::whd_accent(Color::new(0xff8BC34A)),
+                    4 => ColorScheme::whd_accent(Color::new(0xff2196F3)),
+                    5 => ColorScheme::whd_accent(Color::new(0xffFFEB3B)),
+                    _ => ColorScheme::whd_accent(Color::new(0xff3F51B5))
                 }
             } else {
                 self.assets.colors = ColorScheme::dark();
