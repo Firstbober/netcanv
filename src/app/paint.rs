@@ -1,10 +1,12 @@
+use std::path::PathBuf;
+use std::time::SystemTime;
+use std::time::{Duration, Instant};
 use std::{borrow::BorrowMut, collections::VecDeque, ops::Index, str::FromStr};
 use std::{collections::HashSet, io::Write};
 
-use std::path::PathBuf;
-use std::time::{Duration, Instant};
-
 use native_dialog::FileDialog;
+use serde::{Deserialize, Serialize};
+use serde_json::Result;
 use skulpin::skia_safe::paint as skpaint;
 use skulpin::skia_safe::*;
 
@@ -18,11 +20,6 @@ use crate::{
     wallhackd::{self, WHDPaintFunctions},
 };
 use crate::{assets::*, ui};
-
-use std::time::SystemTime;
-
-use serde::{Deserialize, Serialize};
-use serde_json::Result;
 
 extern crate image;
 use image::{GenericImage, GenericImageView, Pixel, RgbaImage, SubImage};
@@ -208,11 +205,10 @@ impl wallhackd::WHDPaintFunctions for State {
 
             if sc.is_some() && self.whd.previous_chunk_data_timestamp.is_some() {
                 match self.whd.previous_chunk_data_timestamp.unwrap().elapsed() {
-                    Ok(time) => {
+                    Ok(time) =>
                         if time.as_secs() > 120 {
                             self.save_to_file = Some(PathBuf::from(sc.unwrap()));
-                        }
-                    }
+                        },
                     Err(_err) => std::process::exit(1),
                 }
             }
@@ -226,7 +222,7 @@ impl wallhackd::WHDPaintFunctions for State {
 
         if self.whd.custom_image.is_none() && self.whd.custom_image_dims.is_none() {
             log!(self.log, "[WallhackD] [Custom Image] Failed!");
-            return;
+            return
         }
 
         // get offset for chunks
@@ -297,9 +293,8 @@ impl wallhackd::WHDPaintFunctions for State {
                 }
 
                 let pos = match self.whd.drawing_direction {
-                    WHDCIDrawingDirection::ToLeft => {
-                        ((x as i32 + x_off as i32) - width_parts as i32, y_off as i32 + y as i32)
-                    }
+                    WHDCIDrawingDirection::ToLeft =>
+                        ((x as i32 + x_off as i32) - width_parts as i32, y_off as i32 + y as i32),
                     WHDCIDrawingDirection::ToRight => (x as i32 + x_off as i32, y as i32 + y_off as i32),
                 };
 
@@ -325,7 +320,7 @@ impl wallhackd::WHDPaintFunctions for State {
                     Some(img) => {
                         chk.surface.borrow_mut().canvas().draw_image(img, (0, 0), None);
                         eprintln!("Drawed master chunk {}, {}", pos.0, pos.1);
-                    }
+                    },
                     None => log!(
                         self.log,
                         "[WallhackD] [Custom Image] !! Something broke and image can't be pasted"
@@ -337,9 +332,8 @@ impl wallhackd::WHDPaintFunctions for State {
         for x in 0..width_parts {
             for y in 0..height_parts {
                 let pos = match self.whd.drawing_direction {
-                    WHDCIDrawingDirection::ToLeft => {
-                        ((x as i32 + x_off as i32) - width_parts as i32, y_off as i32 + y as i32)
-                    }
+                    WHDCIDrawingDirection::ToLeft =>
+                        ((x as i32 + x_off as i32) - width_parts as i32, y_off as i32 + y as i32),
                     WHDCIDrawingDirection::ToRight => (x as i32 + x_off as i32, y as i32 + y_off as i32),
                 };
 
@@ -355,7 +349,7 @@ impl wallhackd::WHDPaintFunctions for State {
                         Some(data) => {
                             chunks_to_send.push((chk_pos, data.to_vec()));
                             eprintln!("Pushed chunk {}, {}", chk_pos.0, chk_pos.1);
-                        }
+                        },
                         None => (),
                     }
                 }
@@ -579,16 +573,13 @@ impl wallhackd::WHDPaintFunctions for State {
 
             self.ui.push_group((self.ui.width(), 32.0), Layout::Horizontal);
             {
-                self.whd.chat_textfeld.process(
-                    &mut self.ui,
-                    canvas,
-                    input,
-                    TextFieldArgs {
+                self.whd
+                    .chat_textfeld
+                    .process(&mut self.ui, canvas, input, TextFieldArgs {
                         width: 722.0,
                         colors: &self.assets.colors.text_field,
                         hint: Some("Message"),
-                    },
-                );
+                    });
 
                 self.ui.space(6.0);
 
@@ -640,11 +631,11 @@ impl wallhackd::WHDPaintFunctions for State {
             for x in mates {
                 if count < 6 * self.whd.teleport_to_person_list_offset {
                     count += 1;
-                    continue;
+                    continue
                 }
 
                 if count > 6 * (self.whd.teleport_to_person_list_offset + 1) {
-                    break;
+                    break
                 }
 
                 self.ui.push_group((self.ui.width(), 32.0), Layout::Horizontal);
@@ -750,11 +741,11 @@ impl wallhackd::WHDPaintFunctions for State {
             for x in mates {
                 if count < 6 * self.whd.get_player_real_life_loc_list_offset {
                     count += 1;
-                    continue;
+                    continue
                 }
 
                 if count > 6 * (self.whd.get_player_real_life_loc_list_offset + 1) {
-                    break;
+                    break
                 }
 
                 self.ui.push_group((self.ui.width(), 32.0), Layout::Horizontal);
@@ -794,7 +785,7 @@ impl wallhackd::WHDPaintFunctions for State {
                                         Err(err) => {
                                             log!(self.log, "[WHD] [IPloc] Error: {}", err);
                                             None
-                                        }
+                                        },
                                     };
 
                                 if per_data.is_some() {
@@ -819,7 +810,7 @@ impl wallhackd::WHDPaintFunctions for State {
                                         log!(self.log, "[WHD] [IPloc] Error: bad ip")
                                     }
                                 }
-                            }
+                            },
                             Err(err) => log!(self.log, "[WHD] [IPloc] Error: {}", err),
                         }
                     }
@@ -892,29 +883,23 @@ impl wallhackd::WHDPaintFunctions for State {
                 self.whd.player_irl_loc_info_window = false;
                 self.whd_overlay_window_end(input);
                 self.ui.pop_group();
-                return;
+                return
             }
 
             let locdata = self.whd.player_irl_loc_info.as_ref().unwrap();
 
-            self.ui.paragraph(
-                canvas,
-                Color::BLACK,
-                AlignH::Left,
-                Some(1.6),
-                &[
-                    format!("Country: {}", locdata.country).as_str(),
-                    format!("Region: {}", locdata.region).as_str(),
-                    format!("City: {}", locdata.city).as_str(),
-                    format!("Zip Code: {}", locdata.zip_code).as_str(),
-                    format!("Latitude: {}", locdata.latitude).as_str(),
-                    format!("Longitude: {}", locdata.longitude).as_str(),
-                    format!("Timezone: {}", locdata.timezone).as_str(),
-                    format!("ISP: {}", locdata.isp).as_str(),
-                    format!("Organization: {}", locdata.organization).as_str(),
-                    format!("Alias: {}", locdata.alias).as_str(),
-                ],
-            );
+            self.ui.paragraph(canvas, Color::BLACK, AlignH::Left, Some(1.6), &[
+                format!("Country: {}", locdata.country).as_str(),
+                format!("Region: {}", locdata.region).as_str(),
+                format!("City: {}", locdata.city).as_str(),
+                format!("Zip Code: {}", locdata.zip_code).as_str(),
+                format!("Latitude: {}", locdata.latitude).as_str(),
+                format!("Longitude: {}", locdata.longitude).as_str(),
+                format!("Timezone: {}", locdata.timezone).as_str(),
+                format!("ISP: {}", locdata.isp).as_str(),
+                format!("Organization: {}", locdata.organization).as_str(),
+                format!("Alias: {}", locdata.alias).as_str(),
+            ]);
 
             self.whd_overlay_window_end(input);
         }
@@ -969,8 +954,8 @@ impl wallhackd::WHDPaintFunctions for State {
         let mouse_pos = self.ui.mouse_position(input);
         let coll_padding = (16.0, 16.0);
 
-        if (mouse_pos.x > -coll_padding.0 && mouse_pos.x < size.0 + coll_padding.0)
-            && (mouse_pos.y > -coll_padding.1 && mouse_pos.y < g_height + coll_padding.1)
+        if (mouse_pos.x > -coll_padding.0 && mouse_pos.x < size.0 + coll_padding.0) &&
+            (mouse_pos.y > -coll_padding.1 && mouse_pos.y < g_height + coll_padding.1)
         {
             self.paint_mode = PaintMode::None;
             self.whd.lock_painting = true;
@@ -1072,6 +1057,7 @@ impl wallhackd::WHDPaintFunctions for State {
             self.whd.chat_window = !self.whd.chat_window;
         }
     }
+
     fn whd_bar_end_buttons(&mut self, canvas: &mut Canvas, input: &Input) {
         if Button::with_icon_and_tooltip(
             &mut self.ui,
@@ -1123,10 +1109,10 @@ impl wallhackd::WHDPaintFunctions for State {
                         Ok(img) => {
                             self.whd.custom_image = Some(img.clone());
                             self.whd.custom_image_dims = Some(img.dimensions());
-                        }
+                        },
                         Err(err) => log!(self.log, "[WallhackD] Got some error when loading image {}", err),
                     };
-                }
+                },
                 None => log!(self.log, "[WallhackD] U selected nothing"),
             };
         }
@@ -1143,13 +1129,10 @@ impl wallhackd::WHDPaintFunctions for State {
                 WHDCIDrawingDirection::ToLeft => &self.assets.icons.whd.backwards,
                 WHDCIDrawingDirection::ToRight => &self.assets.icons.whd.forward,
             },
-            format!(
-                "Drawing direction ({})",
-                match self.whd.drawing_direction {
-                    WHDCIDrawingDirection::ToLeft => "To left",
-                    WHDCIDrawingDirection::ToRight => "To right",
-                }
-            ),
+            format!("Drawing direction ({})", match self.whd.drawing_direction {
+                WHDCIDrawingDirection::ToLeft => "To left",
+                WHDCIDrawingDirection::ToRight => "To right",
+            }),
             WHDTooltipPos::Top,
         )
         .clicked()
@@ -1306,7 +1289,7 @@ impl State {
 
     fn fellow_stroke(canvas: &mut Canvas, paint_canvas: &mut PaintCanvas, points: &[StrokePoint]) {
         if points.is_empty() {
-            return;
+            return
         } // failsafe
 
         let mut from = points[0].point;
@@ -1367,8 +1350,8 @@ impl State {
                 self.whd.custom_image_dims = None;
             }
         }
-        if (input.mouse_button_just_released(MouseButton::Left) || input.mouse_button_just_released(MouseButton::Right))
-            && (self.paint_mode == PaintMode::Paint || self.paint_mode == PaintMode::Erase)
+        if (input.mouse_button_just_released(MouseButton::Left) || input.mouse_button_just_released(MouseButton::Right)) &&
+            (self.paint_mode == PaintMode::Paint || self.paint_mode == PaintMode::Erase)
         {
             self.paint_mode = PaintMode::None;
         }
@@ -1403,7 +1386,7 @@ impl State {
                     self.stroke_buffer.push(StrokePoint { point: to, brush });
                 }
 
-                break;
+                break
             }
         }
 
@@ -1439,7 +1422,7 @@ impl State {
             canvas.scale((self.viewport.zoom(), self.viewport.zoom()));
             canvas.translate(-self.viewport.pan());
 
-            let mut paint = Paint::new(Color4f::from(Color::WHITE.with_a(192)), None);
+            let mut paint = Paint::new(Color4f::from(Color::WHITE.with_a(240)), None);
             paint.set_anti_alias(true);
             paint.set_blend_mode(BlendMode::Difference);
 
@@ -1476,9 +1459,9 @@ impl State {
                         canvas.draw_rect(
                             Rect::from_point_and_size(
                                 (
-                                    (mouse_position.x - (x_off * self.viewport.zoom()))
-                                        - (ch_x_off as f32 * self.viewport.zoom()) as f32
-                                        - 32.0,
+                                    (mouse_position.x - (x_off * self.viewport.zoom())) -
+                                        (ch_x_off as f32 * self.viewport.zoom()) as f32 -
+                                        32.0,
                                     mouse_position.y,
                                 ),
                                 (
@@ -1488,7 +1471,7 @@ impl State {
                             ),
                             &paint,
                         );
-                    }
+                    },
                     WHDCIDrawingDirection::ToRight => {
                         canvas.draw_rect(
                             Rect::from_point_and_size(
@@ -1500,7 +1483,7 @@ impl State {
                             ),
                             &paint,
                         );
-                    }
+                    },
                 };
             }
 
@@ -1586,8 +1569,8 @@ impl State {
                 }
             } else {
                 for chunk_position in self.viewport.visible_tiles(Chunk::SIZE, canvas_size) {
-                    if self.server_side_chunks.contains(&chunk_position)
-                        && !self.requested_chunks.contains(&chunk_position)
+                    if self.server_side_chunks.contains(&chunk_position) &&
+                        !self.requested_chunks.contains(&chunk_position)
                     {
                         self.needed_chunks.insert(chunk_position);
                     }
@@ -1613,8 +1596,8 @@ impl State {
         for hex_color in COLOR_PALETTE {
             let color = hex_color4f(*hex_color);
             self.ui.push_group((16.0, self.ui.height()), Layout::Freeform);
-            let y_offset = self.ui.height()
-                * if self.paint_color == color {
+            let y_offset = self.ui.height() *
+                if self.paint_color == color {
                     0.5
                 } else if self.ui.has_mouse(&input) {
                     0.7
@@ -1647,15 +1630,10 @@ impl State {
         self.ui.pop_group();
 
         self.ui.space(8.0);
-        self.brush_size_slider.process(
-            &mut self.ui,
-            canvas,
-            input,
-            SliderArgs {
-                width: 192.0,
-                color: self.assets.colors.slider,
-            },
-        );
+        self.brush_size_slider.process(&mut self.ui, canvas, input, SliderArgs {
+            width: 192.0,
+            color: self.assets.colors.slider,
+        });
         self.ui.space(8.0);
 
         let brush_size_string = self.brush_size_slider.value().to_string();
@@ -1702,7 +1680,7 @@ impl State {
             {
                 Ok(Some(path)) => {
                     self.save_to_file = Some(path);
-                }
+                },
                 Err(error) => log!(self.log, "Error while selecting file: {}", error),
                 _ => (),
             }
@@ -1779,7 +1757,7 @@ impl AppState for State {
         // network
 
         match self.peer.tick() {
-            Ok(messages) => {
+            Ok(messages) =>
                 for message in messages {
                     match message {
                         Message::Error(error) => self.error = Some(error),
@@ -1792,7 +1770,7 @@ impl AppState for State {
                             eprintln!("received {} chunk positions", positions.len());
                             eprintln!("the positions are: {:?}", &positions);
                             self.server_side_chunks = positions.drain(..).collect();
-                        }
+                        },
                         Message::Chunks(chunks) => {
                             eprintln!("received {} chunks", chunks.len());
                             for (chunk_position, png_data) in chunks {
@@ -1806,17 +1784,16 @@ impl AppState for State {
                                 );
                                 self.downloaded_chunks.insert(chunk_position);
                             }
-                        }
+                        },
                         Message::WHDChatMessage(msg) => {
                             log!(self.log, "{}", msg);
-                        }
+                        },
                         message => self.deferred_message_queue.push_back(message),
                     }
-                }
-            }
+                },
             Err(error) => {
                 self.error = Some(format!("{}", error));
-            }
+            },
         }
 
         for message in self.deferred_message_queue.drain(..) {
@@ -1827,7 +1804,7 @@ impl AppState for State {
                         let positions = self.paint_canvas.chunk_positions();
                         ok_or_log!(self.log, self.peer.send_chunk_positions(addr, positions));
                     }
-                }
+                },
                 Message::GetChunks(addr, positions) => {
                     eprintln!("got request from {} for {} chunks", addr, positions.len());
                     let paint_canvas = &mut self.paint_canvas;
@@ -1844,7 +1821,7 @@ impl AppState for State {
                         ok_or_log!(self.log, self.peer.send_chunks(addr, packet));
                     }
                     eprintln!("  all packets sent");
-                }
+                },
                 _ => unreachable!("unhandled peer message type"),
             }
         }

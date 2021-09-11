@@ -210,10 +210,10 @@ impl ColorScheme {
             error: Color::new(0xff7f0000),
 
             button: ButtonColors {
-                outline: Color::new(0x40000000),
+                outline: Color::new(0x60000000),
                 text: Color::new(0xff000000),
-                hover: Color::new(0x20000000),
-                pressed: Color::new(0x50000000),
+                hover: Color::new(0x40000000),
+                pressed: Color::new(0x70000000),
 
                 whd_tooltip_bg: tooltip_bg,
                 whd_tooltip_text: tooltip_text,
@@ -221,8 +221,8 @@ impl ColorScheme {
             tool_button: ButtonColors {
                 outline: Color::new(0x00000000),
                 text: Color::new(0xff000000),
-                hover: Color::new(0x20000000),
-                pressed: Color::new(0x50000000),
+                hover: Color::new(0x40000000),
+                pressed: Color::new(0x70000000),
 
                 whd_tooltip_bg: tooltip_bg,
                 whd_tooltip_text: tooltip_text,
@@ -231,8 +231,8 @@ impl ColorScheme {
             expand: ExpandColors {
                 icon: Color::new(0xff000000),
                 text: Color::new(0xff000000),
-                hover: Color::new(0x30000000),
-                pressed: Color::new(0x60000000),
+                hover: Color::new(0x40000000),
+                pressed: Color::new(0x70000000),
             },
             text_field: TextFieldColors {
                 outline: Color::new(0xff808080),
@@ -264,16 +264,18 @@ impl ColorScheme {
             button: ButtonColors {
                 outline: Color::new(0xff444444),
                 text: Color::new(0xffd2d2d2),
-                hover: Color::new(0x20ffffff),
-                pressed: Color::new(0x10ffffff),
+                hover: Color::new(0x10ffffff),
+                pressed: Color::new(0x05ffffff),
+
                 whd_tooltip_bg: Color::new(0xffb7b7b7),
                 whd_tooltip_text: Color::new(0xff1f1f1f),
             },
             tool_button: ButtonColors {
                 outline: Color::new(0x00000000),
                 text: Color::new(0xffb7b7b7),
-                hover: Color::new(0x20ffffff),
-                pressed: Color::new(0x10ffffff),
+                hover: Color::new(0x10ffffff),
+                pressed: Color::new(0x05ffffff),
+
                 whd_tooltip_bg: Color::new(0xffb7b7b7),
                 whd_tooltip_text: Color::new(0xff1f1f1f),
             },
@@ -281,8 +283,8 @@ impl ColorScheme {
             expand: ExpandColors {
                 icon: Color::new(0xffb7b7b7),
                 text: Color::new(0xffb7b7b7),
-                hover: Color::new(0x60ffffff),
-                pressed: Color::new(0x30ffffff),
+                hover: Color::new(0x30ffffff),
+                pressed: Color::new(0x15ffffff),
             },
             text_field: TextFieldColors {
                 outline: Color::new(0xff595959),

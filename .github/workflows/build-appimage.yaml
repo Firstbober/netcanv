@@ -1,17 +1,16 @@
-name: Generate AppImages
+name: Build AppImage
 
 on:
   push:
-    branches: [ wallhackd ]
+    branches: [wallhackd]
   pull_request:
-    branches: [ wallhackd ]
+    branches: [wallhackd]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  build-appimage:
     runs-on: ubuntu-latest
 
     steps:

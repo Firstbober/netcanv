@@ -1,12 +1,15 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::error::Error;
 
+use skulpin::rafx::api::RafxExtents2D;
 use skulpin::*;
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 #[cfg(target_family = "unix")]
 use winit::platform::unix::*;
-use winit::window::WindowBuilder;
+use winit::window::{Window, WindowBuilder};
 
 mod app;
 mod assets;
@@ -135,12 +138,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut app: Option<Box<dyn AppState>> = Some(Box::new(lobby::State::new(assets, None)) as _);
 
         let coordinate_system_helper = CoordinateSystemHelper::new(
-            skulpin::ash::vk::Extent2D {
+            RafxExtents2D {
                 width: 1024,
                 height: 600,
             },
-            skulpin::LogicalSize::new(1024, 600),
-            PhysicalSize::new(1024, 600),
             1.0,
         );
         coordinate_system_helper.use_logical_coordinates(&mut headless_canvas);
@@ -155,7 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     } else {
         let event_loop = EventLoop::new();
-        let winit_window = {
+        let window = {
             let mut b = WindowBuilder::new()
                 .with_inner_size(LogicalSize::new(1024, 600))
                 .with_title("[WHD] NetCanv")
@@ -168,16 +169,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         .build(&event_loop)?;
 
-        winit_window.set_window_icon(Some(
+        window.set_window_icon(Some(
             winit::window::Icon::from_rgba(::image::load_from_memory(NETCANV_ICON).unwrap().to_bytes(), 512, 512)
                 .unwrap(),
         ));
 
         #[cfg(target_family = "unix")]
-        winit_window.set_wayland_theme(ColorScheme::light());
+        window.set_wayland_theme(ColorScheme::light());
 
-        let window = WinitWindow::new(&winit_window);
-        let mut renderer = RendererBuilder::new().use_vulkan_debug_layer(false).build(&window)?;
+        let window_size = get_window_extents(&window);
+        let mut renderer = RendererBuilder::new().build(&window, window_size)?;
 
         let mut assets = Assets::new(ColorScheme::light());
         assets.whd_add_commandline(whd_cmd);
@@ -185,20 +186,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut input = Input::new();
 
         event_loop.run(move |event, _, control_flow| {
-            let window = WinitWindow::new(&winit_window);
             *control_flow = ControlFlow::Poll;
 
             match event {
-                Event::WindowEvent { event, .. } => {
+                Event::WindowEvent { event, .. } =>
                     if let WindowEvent::CloseRequested = event {
                         *control_flow = ControlFlow::Exit;
                     } else {
                         input.process_event(&event);
-                    }
-                }
+                    },
 
                 Event::MainEventsCleared => {
-                    match renderer.draw(&window, |canvas, csh| {
+                    let window_size = get_window_extents(&window);
+                    let scale_factor = window.scale_factor();
+                    match renderer.draw(window_size, scale_factor, |canvas, csh| {
                         // unwrap always succeeds here as app is never None
                         // i don't really like this method chaining tho
                         app.as_mut().unwrap().process(StateArgs {
@@ -212,10 +213,23 @@ fn main() -> Result<(), Box<dyn Error>> {
                         _ => (),
                     };
                     input.finish_frame();
-                }
+                },
+
+                Event::LoopDestroyed => {
+                    // Fix for SIGSEGV inside of skia-[un]safe due to a Surface not being dropped properly.
+                    // Not sure what that's all about, but this little snippet fixes the bug so eh, why not.
+                    drop(app.take().unwrap());
+                },
 
                 _ => (),
             }
         });
+    }
+}
+
+fn get_window_extents(window: &Window) -> RafxExtents2D {
+    RafxExtents2D {
+        width: window.inner_size().width,
+        height: window.inner_size().height,
     }
 }
