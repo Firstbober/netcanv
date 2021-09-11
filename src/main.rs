@@ -2,6 +2,7 @@
 
 use std::error::Error;
 
+use config::UserConfig;
 use skulpin::rafx::api::RafxExtents2D;
 use skulpin::*;
 use winit::dpi::LogicalSize;
@@ -13,6 +14,7 @@ use winit::window::{Window, WindowBuilder};
 
 mod app;
 mod assets;
+mod config;
 mod net;
 mod paint_canvas;
 mod ui;
@@ -117,12 +119,33 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
     }
 
+    let mut config = UserConfig::load_or_create()?;
+    let color_scheme = match config.ui.color_scheme {
+        config::ColorScheme::Light => ColorScheme::light(),
+        config::ColorScheme::Dark => ColorScheme::dark(),
+        config::ColorScheme::WHDAccent => ColorScheme::whd_accent(skulpin::skia_safe::Color::new(
+            u32::from_str_radix(config.ui.whd_accent_color.clone().unwrap().as_str(), 16).unwrap(),
+        )),
+    };
+
+    //config.ui.whd_accent_color.clone().unwrap().parse::<u32>().unwrap()
+
     whd_cmd.username = resolve_str!("username");
     whd_cmd.matchmaker_addr = resolve_str!("mm_address");
     whd_cmd.roomid = resolve_str!("roomid");
 
     whd_cmd.save_canvas = resolve_str!("save_canvas");
     whd_cmd.load_canvas = resolve_str!("load_canvas");
+
+    if whd_cmd.username.is_some() {
+        config.lobby.nickname = whd_cmd.username.clone().unwrap();
+    }
+
+    if whd_cmd.matchmaker_addr.is_some() {
+        config.lobby.nickname = whd_cmd.matchmaker_addr.clone().unwrap();
+    }
+
+    let mut assets = Assets::new(color_scheme);
 
     if whd_cmd.headless_client || whd_cmd.headless_host {
         println!("Starting in headless mode");
@@ -131,11 +154,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut headless_canvas = headless_surface.canvas();
 
         let mut input = Input::new();
-        let mut assets = Assets::new(ColorScheme::light());
-
         assets.whd_add_commandline(whd_cmd);
 
-        let mut app: Option<Box<dyn AppState>> = Some(Box::new(lobby::State::new(assets, None)) as _);
+        let mut app: Option<Box<dyn AppState>> = Some(Box::new(lobby::State::new(assets, config, None)) as _);
 
         let coordinate_system_helper = CoordinateSystemHelper::new(
             RafxExtents2D {
@@ -180,9 +201,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let window_size = get_window_extents(&window);
         let mut renderer = RendererBuilder::new().build(&window, window_size)?;
 
-        let mut assets = Assets::new(ColorScheme::light());
         assets.whd_add_commandline(whd_cmd);
-        let mut app: Option<Box<dyn AppState>> = Some(Box::new(lobby::State::new(assets, None)) as _);
+        let mut app: Option<Box<dyn AppState>> = Some(Box::new(lobby::State::new(assets, config, None)) as _);
         let mut input = Input::new();
 
         event_loop.run(move |event, _, control_flow| {

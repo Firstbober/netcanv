@@ -1,6 +1,7 @@
 use skulpin::skia_safe::*;
 use skulpin::CoordinateSystemHelper;
 
+use crate::config::UserConfig;
 use crate::ui::*;
 
 pub struct StateArgs<'a, 'b, 'c> {

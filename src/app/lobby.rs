@@ -8,6 +8,7 @@ use skulpin::skia_safe::*;
 
 use crate::{app::{paint, AppState, StateArgs}, wallhackd::{self, WHDLobbyFunctions}};
 use crate::assets::{Assets, ColorScheme};
+use crate::config::{self, UserConfig};
 use crate::net::{Message, Peer};
 use crate::ui::*;
 use crate::util::get_window_size;
@@ -18,6 +19,17 @@ enum Status {
     None,
     Info(String),
     Error(String),
+}
+
+impl Status {
+    fn catch<T, E: Display>(&mut self, result: Result<T, E>) {
+        match result {
+            Ok(..) => (),
+            Err(error) => {
+                let _ = std::mem::replace(self, error.into());
+            },
+        }
+    }
 }
 
 impl<T: Display> From<T> for Status {
@@ -40,6 +52,7 @@ pub struct WHDState {
 
 pub struct State {
     assets: Assets,
+    config: UserConfig,
     ui: Ui,
 
     // UI elements
@@ -262,32 +275,41 @@ impl wallhackd::WHDLobbyFunctions for State {
             }
 
             if self.whd.whd_accent > 0 {
-                self.assets.colors = match self.whd.whd_accent {
-                    1 => ColorScheme::whd_accent(Color::new(0xffF44336)),
-                    2 => ColorScheme::whd_accent(Color::new(0xffFF5722)),
-                    3 => ColorScheme::whd_accent(Color::new(0xff8BC34A)),
-                    4 => ColorScheme::whd_accent(Color::new(0xff2196F3)),
-                    5 => ColorScheme::whd_accent(Color::new(0xffFFEB3B)),
-                    _ => ColorScheme::whd_accent(Color::new(0xff3F51B5))
-                }
+                let color = match self.whd.whd_accent {
+                    1 => 0xffF44336,
+                    2 => 0xffFF5722,
+                    3 => 0xff8BC34A,
+                    4 => 0xff2196F3,
+                    5 => 0xffFFEB3B,
+                    _ => 0xff3F51B5
+                };
+
+                self.assets.colors = ColorScheme::whd_accent(Color::new(color));
+
+                self.config.ui.color_scheme = config::ColorScheme::WHDAccent;
+                self.config.ui.whd_accent_color = Some(format!("{:x}", color));
             } else {
                 self.assets.colors = ColorScheme::dark();
+                self.config.ui.color_scheme = config::ColorScheme::Dark;
             }
+
+            self.save_config();
         }
     }
 }
 
 impl State {
-    pub fn new(assets: Assets, error: Option<&str>) -> Self {
-        let username = assets.whd_commandline.username.clone().unwrap_or("Anon".to_owned());
-        let mm_addr = assets.whd_commandline.matchmaker_addr.clone().unwrap_or("localhost:62137".to_owned());
+    pub fn new(assets: Assets, config: UserConfig, error: Option<&str>) -> Self {
+        let nickname_field = TextField::new(Some(&config.lobby.nickname));
+        let matchmaker_field = TextField::new(Some(&config.lobby.matchmaker));
         let roomid = assets.whd_commandline.roomid.clone().unwrap_or("".to_owned());
 
         Self {
             assets,
+            config,
             ui: Ui::new(),
-            nickname_field: TextField::new(Some(username.as_str())),
-            matchmaker_field: TextField::new(Some(mm_addr.as_str())),
+            nickname_field,
+            matchmaker_field,
             room_id_field: TextField::new(Some(roomid.as_str())),
             join_expand: Expand::new(true),
             host_expand: Expand::new(false),
@@ -343,7 +365,7 @@ impl State {
 
         let button = ButtonArgs {
             height: 32.0,
-            colors: &self.assets.colors.button,
+            colors: &self.assets.colors.button.clone(),
         };
         let textfield = TextFieldArgs {
             width: 160.0,
@@ -458,6 +480,7 @@ impl State {
             self.ui
                 .push_group((self.ui.remaining_width(), 32.0), Layout::Horizontal);
             if Button::with_text(&mut self.ui, canvas, input, button, "Host").clicked() {
+                self.save_config();
                 host_room!();
             }
             self.ui.space(8.0);
@@ -472,6 +495,7 @@ impl State {
                 {
                     Ok(Some(path)) => {
                         self.image_file = Some(path);
+                        self.save_config();
                         host_room!();
                     },
                     Err(error) => self.status = Status::from(error),
@@ -595,6 +619,15 @@ impl State {
             .map_err(|_| Status::Error("Room ID must be an integer".into()))?;
         Ok(Peer::join(nickname, matchmaker_addr_str, room_id)?)
     }
+
+    fn save_config(&mut self) {
+        self.config.lobby.nickname = self.nickname_field.text().to_owned();
+        self.config.lobby.matchmaker = self.matchmaker_field.text().to_owned();
+        self.status = match self.config.save() {
+            Ok(..) => Status::None,
+            Err(error) => error.into(),
+        };
+    }
 }
 
 impl AppState for State {
@@ -650,7 +683,7 @@ impl AppState for State {
                 height: 32.0,
                 colors: &self.assets.colors.tool_button,
             },
-            if self.assets.dark_mode {
+            if self.config.ui.color_scheme == config::ColorScheme::Dark {
                 &self.assets.icons.color_switcher.light
             } else {
                 &self.assets.icons.color_switcher.dark
@@ -658,12 +691,16 @@ impl AppState for State {
         )
         .clicked()
         {
-            self.assets.dark_mode = !self.assets.dark_mode;
-
-            if self.assets.dark_mode {
-                self.assets.colors = ColorScheme::dark();
-            } else {
-                self.assets.colors = ColorScheme::light();
+            self.config.ui.color_scheme = match self.config.ui.color_scheme {
+                config::ColorScheme::Light => config::ColorScheme::Dark,
+                config::ColorScheme::Dark => config::ColorScheme::Light,
+                config::ColorScheme::WHDAccent => config::ColorScheme::Dark
+            };
+            self.save_config();
+            match self.config.ui.color_scheme {
+                config::ColorScheme::Light => self.assets.colors = ColorScheme::light(),
+                config::ColorScheme::Dark => self.assets.colors = ColorScheme::dark(),
+                config::ColorScheme::WHDAccent => self.assets.colors = ColorScheme::dark()
             }
         }
 
@@ -674,7 +711,12 @@ impl AppState for State {
 
     fn next_state(self: Box<Self>) -> Box<dyn AppState> {
         if self.connected {
-            Box::new(paint::State::new(self.assets, self.peer.unwrap(), self.image_file))
+            Box::new(paint::State::new(
+                self.assets,
+                self.config,
+                self.peer.unwrap(),
+                self.image_file,
+            ))
         } else {
             self
         }

@@ -37,11 +37,7 @@ const GPS_FIXED: &[u8] = include_bytes!("assets/icons/gps_fixed.svg");
 
 // [WHD]
 
-pub enum ColorSchemeType {
-    Light,
-    Dark,
-}
-
+#[derive(Clone)]
 pub struct ColorScheme {
     pub text: Color,
     pub panel: Color,
@@ -396,6 +392,7 @@ impl ColorScheme {
     }
 }
 
+#[derive(Clone)]
 pub struct TitlebarColors {
     pub titlebar: Color,
     pub separator: Color,
