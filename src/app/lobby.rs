@@ -192,8 +192,8 @@ impl wallhackd::WHDLobbyFunctions for State {
 
             self.ui.paragraph(canvas, self.assets.colors.text, AlignH::Left, None, &[
                 "Create a blank canvas, or load one from file.",
-                "WallhackD Matchmaker provides function for rooms with custom ID's,",
-                "please enter one to start."
+                "WallhackD-Enabled Matchmaker is required.",
+                "Please enter room ID to start."
             ]);
             self.ui.space(16.0);
             self.ui.push_group((0.0, TextField::labelled_height(&self.ui)), Layout::Horizontal);
@@ -341,7 +341,7 @@ impl State {
 
         self.ui.push_group((self.ui.width(), 56.0), Layout::Freeform);
         self.ui.set_font_size(48.0);
-        self.ui.text(canvas, "NetCanv [WHD]", self.assets.colors.text, (AlignH::Left, AlignV::Middle));
+        self.ui.text(canvas, "NetCanv", self.assets.colors.text, (AlignH::Left, AlignV::Middle));
 
         self.ui.pop_group();
 
@@ -349,13 +349,25 @@ impl State {
             .push_group((self.ui.width(), self.ui.remaining_height()), Layout::Freeform);
         self.ui.text(
             canvas,
-            "[WHD] by Firstbober. Welcome! Host a room or join an existing one to start painting.",
+            "Welcome! Host a room or join an existing one to start painting.",
             self.assets.colors.text,
             (AlignH::Left, AlignV::Middle),
         );
         self.ui.pop_group();
 
+        self.ui
+        .push_group((self.ui.width(), self.ui.remaining_height()), Layout::Freeform);
+        self.ui.text(
+            canvas,
+            "[WHD] Enabled, by Firstbober",
+            self.assets.colors.text,
+            (AlignH::Left, AlignV::Middle)
+        );
         self.ui.pop_group();
+
+        self.ui.pop_group();
+
+        self.ui.space(8.0);
     }
 
     fn process_menu(&mut self, canvas: &mut Canvas, input: &mut Input) -> Option<Box<dyn AppState>> {

@@ -2,7 +2,7 @@ use crate::ui::{self, ButtonProcessResult};
 
 use skulpin::skia_safe as skia;
 
-pub const WALLHACKD_VERSION: &str = "1.1.3";
+pub const WALLHACKD_VERSION: &str = "1.1.4";
 
 pub struct WHDCommandLine {
     pub headless_client: bool,
