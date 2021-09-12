@@ -128,8 +128,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         )),
     };
 
-    //config.ui.whd_accent_color.clone().unwrap().parse::<u32>().unwrap()
-
     whd_cmd.username = resolve_str!("username");
     whd_cmd.matchmaker_addr = resolve_str!("mm_address");
     whd_cmd.roomid = resolve_str!("roomid");
@@ -145,7 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         config.lobby.matchmaker = whd_cmd.matchmaker_addr.clone().unwrap();
     }
 
-    let mut assets = Assets::new(color_scheme);
+    let mut assets = Assets::new(color_scheme.clone());
 
     if whd_cmd.headless_client || whd_cmd.headless_host {
         println!("Starting in headless mode");
@@ -196,7 +194,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ));
 
         #[cfg(target_family = "unix")]
-        window.set_wayland_theme(ColorScheme::light());
+        window.set_wayland_theme(color_scheme);
 
         let window_size = get_window_extents(&window);
         let mut renderer = RendererBuilder::new().build(&window, window_size)?;

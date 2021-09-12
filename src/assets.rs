@@ -345,7 +345,7 @@ impl ColorScheme {
             panel: bg,
             panel2: Color::new(0xffffffff),
             separator: Color::new(0xff202020),
-            error: accent,
+            error: blend_colors(Color::new(0xffF44336), accent, 0.4),
 
             button: ButtonColors {
                 outline: accent,
@@ -381,12 +381,12 @@ impl ColorScheme {
                 label: fg,
             },
             titlebar: TitlebarColors {
-                titlebar: bg,
-                separator: Color::new(0x7fc8c8c8),
+                titlebar: accent,
+                separator: fg,
                 text: fg,
 
-                foreground_hover: Color::new(0xff1f1f1f),
-                button: Color::new(0xffb7b7b7),
+                foreground_hover: fg,
+                button: darken_color(accent, 0.35),
             },
         }
     }
