@@ -1,9 +1,8 @@
 ## WallhackD
 
 ### Changes
-- Dark theme
 - Pasting images
-- Custom Room ID with Wallhackd Matchmaker
+- Custom Room ID with WallhackD Matchmaker
 - Command line options
 - Headless client and server
 - Save canvas without UI
@@ -13,6 +12,8 @@
 - Teleport around using handy inputs
 - RGB Color input
 - Chat between WallhackD clients
+- Find player real life location
+- Themes based on selected colors (you can change color in config)
 
 # NetCanv
 
