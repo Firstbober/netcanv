@@ -27,7 +27,7 @@ use app::*;
 use assets::*;
 use ui::input::*;
 
-const NETCANV_ICON: &[u8] = include_bytes!("../appimage/netcanv.png");
+const NETCANV_ICON: &[u8] = include_bytes!("../resources/netcanv.png");
 
 fn main() -> Result<(), Box<dyn Error>> {
     let clp_matches = clap::App::new("netcanv WallhackD")

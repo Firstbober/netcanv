@@ -1,0 +1,55 @@
+name: Build executables
+
+on:
+  push:
+    branches: [wallhackd]
+  pull_request:
+    branches: [wallhackd]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-appimage:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Compile application
+      run: cargo build --release
+    - name: Compile matchmaker
+      working-directory: netcanv-matchmaker
+      run: cargo build --release
+
+    - name: Build AppImages
+      run: bash build/appimages.sh
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2.2.2
+      with:
+        name: netcanv-nightly-linux
+        path: appimages
+
+  build-exe:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Compile application
+      run: cargo build --release
+    - name: Compile matchmaker
+      working-directory: netcanv-matchmaker
+      run: cargo build --release
+
+    - name: Apply icons to executables
+      run: ./build/windows-icons.ps1
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: netcanv-nightly-windows
+        path: |
+          target/release/netcanv.exe
+          target/release/netcanv-matchmaker.exe
