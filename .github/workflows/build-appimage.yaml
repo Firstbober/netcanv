@@ -2,9 +2,9 @@ name: Build AppImage
 
 on:
   push:
-    branches: [master]
+    branches: [release-ci]
   pull_request:
-    branches: [master]
+    branches: [release-ci]
 
 env:
   CARGO_TERM_COLOR: always
