@@ -1,3 +1,5 @@
+//! Pressable buttons.
+
 use skulpin::skia_safe::*;
 
 use crate::ui::*;
@@ -14,8 +16,10 @@ pub struct WHDButtonProps {
     tooltip_position: Option<WHDTooltipPos>
 }
 
+/// A button. This simply acts as a namespace for button-related functionality.
 pub struct Button;
 
+/// The color scheme of a button.
 #[derive(Clone)]
 pub struct ButtonColors {
     pub outline: Color,
@@ -27,17 +31,25 @@ pub struct ButtonColors {
     pub whd_tooltip_text: Color
 }
 
+/// The layout and color scheme arguments for processing the button.
 #[derive(Clone, Copy)]
 pub struct ButtonArgs<'a> {
     pub height: f32,
     pub colors: &'a ButtonColors,
 }
 
+/// The result of button interaction computed after processing it.
 pub struct ButtonProcessResult {
     clicked: bool,
 }
 
 impl Button {
+    /// Processes a generic button.
+    ///
+    /// The `width_hint` can be provided to specify how wide the button is ahead of time. This must
+    /// be provided for the button to work with reversed layouts.
+    ///
+    /// `extra` is used for rendering extra things on top of the button.
     pub fn process(
         ui: &mut Ui,
         canvas: &mut Canvas,
@@ -122,6 +134,7 @@ impl Button {
         ButtonProcessResult { clicked }
     }
 
+    /// Processes a button with text rendered on top.
     pub fn with_text(
         ui: &mut Ui,
         canvas: &mut Canvas,
@@ -141,6 +154,7 @@ impl Button {
         })
     }
 
+    /// Processes a button with a square icon rendered on top.
     pub fn with_icon(
         ui: &mut Ui,
         canvas: &mut Canvas,

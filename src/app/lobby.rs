@@ -1,6 +1,8 @@
+// The lobby app state.
+
 use std::{borrow::Borrow, error::Error};
+
 use std::fmt::Display;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use native_dialog::FileDialog;
@@ -13,7 +15,7 @@ use crate::net::{Message, Peer};
 use crate::ui::*;
 use crate::util::get_window_size;
 
-
+/// A status returned from some other part of the app.
 #[derive(Debug)]
 enum Status {
     None,
@@ -22,6 +24,7 @@ enum Status {
 }
 
 impl Status {
+    /// Catches an error condition into the status.
     fn catch<T, E: Display>(&mut self, result: Result<T, E>) {
         match result {
             Ok(..) => (),
@@ -50,6 +53,7 @@ pub struct WHDState {
     whd_accent: u8,
 }
 
+/// The lobby app state.
 pub struct State {
     assets: Assets,
     config: UserConfig,
@@ -299,6 +303,7 @@ impl wallhackd::WHDLobbyFunctions for State {
 }
 
 impl State {
+    /// Creates and initializes the lobby state.
     pub fn new(assets: Assets, config: UserConfig, error: Option<&str>) -> Self {
         let nickname_field = TextField::new(Some(&config.lobby.nickname));
         let matchmaker_field = TextField::new(Some(&config.lobby.matchmaker));
@@ -336,6 +341,7 @@ impl State {
         }
     }
 
+    /// Processes the header (app name and welcome message).
     fn process_header(&mut self, canvas: &mut Canvas) {
         self.ui.push_group((self.ui.width(), 92.0), Layout::Vertical);
 
@@ -370,6 +376,8 @@ impl State {
         self.ui.space(8.0);
     }
 
+    /// Processes the connection menu (nickname and matchmaker fields and two Expands with options
+    /// for joining or hosting a room).
     fn process_menu(&mut self, canvas: &mut Canvas, input: &mut Input) -> Option<Box<dyn AppState>> {
         self.whd_process_menu_start(canvas, input);
 
@@ -533,6 +541,7 @@ impl State {
         None
     }
 
+    /// Processes the status report box.
     fn process_status(&mut self, canvas: &mut Canvas) {
         match self.status.borrow() {
             Status::None => (),
@@ -591,6 +600,7 @@ impl State {
 
     }
 
+    /// Checks whether a nickname is valid.
     fn validate_nickname(nickname: &str) -> Result<(), Status> {
         if nickname.is_empty() {
             return Err(Status::Error("Nickname must not be empty".into()))
@@ -601,6 +611,7 @@ impl State {
         Ok(())
     }
 
+    /// Establishes a connection to the matchmaker and hosts a new room.
     fn host_room(nickname: &str, matchmaker_addr_str: &str) -> Result<Peer, Status> {
         Self::validate_nickname(nickname)?;
         Ok(Peer::host(nickname, matchmaker_addr_str)?)
@@ -619,6 +630,7 @@ impl State {
         Ok(Peer::whd_host_with_custom_id(nickname, matchmaker_addr_str, room_id)?)
     }
 
+    /// Establishes a connection to the matchmaker and joins an existing room.
     fn join_room(nickname: &str, matchmaker_addr_str: &str, room_id_str: &str) -> Result<Peer, Status> {
         if !matches!(room_id_str.len(), 1..=9) {
             return Err(Status::Error("Room ID must be a number with 1–9 digits".into()))
@@ -630,6 +642,7 @@ impl State {
         Ok(Peer::join(nickname, matchmaker_addr_str, room_id)?)
     }
 
+    /// Saves the user configuration.
     fn save_config(&mut self) {
         self.config.lobby.nickname = self.nickname_field.text().to_owned();
         self.config.lobby.matchmaker = self.matchmaker_field.text().to_owned();

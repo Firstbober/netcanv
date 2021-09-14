@@ -1,3 +1,28 @@
+//
+// NetCanv - online collaborative paint canvas
+// Copyright (C) 2021, liquidev and contributors
+//
+// Licensed under the MIT license. Check LICENSE.txt in the repository root for details.
+//
+// Welcome to main.rs! You've come this far, and I'm happy to see you here.
+// Here are some points of interest within the codebase:
+//
+//  - main.rs - handles platform details, such as opening a window and setting up the renderer.
+//  - paint_canvas.rs - the infinite paint canvas.
+//  - assets.rs - asset loading and color schemes.
+//  - assets/ - does not contain any code, but rather actual assets, such as fonts and icons.
+//  - app/ - contains app states (the lobby and paint UI).
+//  - net/ - contains networking-related code (communicating with the matchmaker and other clients).
+//  - ui/ - contains NetCanv's bespoke UI framework, as well as all the widgets.
+//
+// This list may become out of date with time, as the app gets refactored, so feel free to explore,
+// and maybe even send a PR if you think something here is wrong.
+//
+// I hope you enjoy hacking on NetCanv!
+//    - liquidev
+//
+
+// Prevent opening a console on Windows if this is a release build.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::error::Error;
@@ -245,6 +270,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
+/// Returns the rafx extents for the window.
 fn get_window_extents(window: &Window) -> RafxExtents2D {
     RafxExtents2D {
         width: window.inner_size().width,

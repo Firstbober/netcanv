@@ -1361,7 +1361,7 @@ dependencies = [
 
 [[package]]
 name = "netcanv"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bincode",
@@ -1371,6 +1371,7 @@ dependencies = [
  "image",
  "native-dialog",
  "netcanv-protocol",
+ "nysa",
  "reqwest",
  "resvg",
  "serde",
@@ -1519,6 +1520,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "nysa"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f63733d42d8d8bfb67f34d05ae85e8cda4260d4f0a3dbdf1433374d5653b9005"
+dependencies = [
+ "lazy_static",
 ]
 
 [[package]]

@@ -1,9 +1,10 @@
-// quite simplistic text field implementation.
+//! A fairly simplistic text field implementation.
 
 use skulpin::skia_safe::*;
 
 use crate::ui::*;
 
+/// A text field's state.
 pub struct TextField {
     text: Vec<char>,
     text_utf8: String,
@@ -11,6 +12,7 @@ pub struct TextField {
     blink_start: f32,
 }
 
+/// A text field's color scheme.
 #[derive(Clone)]
 pub struct TextFieldColors {
     pub outline: Color,
@@ -21,6 +23,7 @@ pub struct TextFieldColors {
     pub label: Color,
 }
 
+/// Processing arguments for a text field.
 #[derive(Clone, Copy)]
 pub struct TextFieldArgs<'a, 'b> {
     pub width: f32,
@@ -43,11 +46,13 @@ impl WHDTextFieldEvent {
 }
 
 impl TextField {
+    /// The backspace character.
     const BACKSPACE: char = '\x08';
+    /// The blinking period of the caret.
     const BLINK_PERIOD: f32 = 1.0;
     const HALF_BLINK: f32 = Self::BLINK_PERIOD / 2.0;
-    const TAB: char = '\x09';
 
+    /// Creates a new text field, with the optionally provided initial text.
     pub fn new(initial_text: Option<&str>) -> Self {
         let text_utf8: String = initial_text.unwrap_or("").into();
         Self {
@@ -58,14 +63,17 @@ impl TextField {
         }
     }
 
+    /// Updates the text field's UTF-8 string.
     fn update_utf8(&mut self) {
         self.text_utf8 = self.text.iter().collect();
     }
 
+    /// Returns the height of a text field.
     pub fn height(ui: &Ui) -> f32 {
         f32::round(16.0 / 7.0 * ui.font_size())
     }
 
+    /// Processes a text field.
     pub fn process(
         &mut self,
         ui: &mut Ui,
@@ -79,7 +87,7 @@ impl TextField {
         ui.draw_on_canvas(canvas, |canvas| {
             let mut paint = Paint::new(Color4f::from(colors.fill), None);
             paint.set_anti_alias(true);
-            let mut rrect = RRect::new_rect_xy(&Rect::from_point_and_size((0.0, 0.0), ui.size()), 0.0, 0.0);
+            let mut rrect = RRect::new_rect_xy(&Rect::from_point_and_size((0.0, 0.0), ui.size()), 4.0, 4.0);
             canvas.draw_rrect(rrect, &paint);
             paint.set_color(if self.focused {
                 colors.outline_focus
@@ -126,20 +134,24 @@ impl TextField {
         evs
     }
 
+    /// Resets the text field's blink timer.
     fn reset_blink(&mut self, input: &Input) {
         self.blink_start = input.time_in_seconds();
     }
 
+    /// Appends a character to the end of the text.
     fn append(&mut self, ch: char) {
         self.text.push(ch);
         self.update_utf8();
     }
 
+    /// Removes a character from the end of the text.
     fn backspace(&mut self) {
         self.text.pop();
         self.update_utf8();
     }
 
+    /// Processes input events.
     fn process_events(&mut self, ui: &Ui, input: &Input) -> WHDTextFieldEvent {
         let mut ev = WHDTextFieldEvent::None;
 
@@ -171,10 +183,12 @@ impl TextField {
         ev
     }
 
+    /// Returns the height of a labelled text field.
     pub fn labelled_height(ui: &Ui) -> f32 {
         16.0 + TextField::height(ui)
     }
 
+    /// Processes a text field with an extra label above it.
     pub fn with_label(&mut self, ui: &mut Ui, canvas: &mut Canvas, input: &Input, label: &str, args: TextFieldArgs) {
         ui.push_group((args.width, Self::labelled_height(ui)), Layout::Vertical);
 
@@ -189,6 +203,7 @@ impl TextField {
         ui.pop_group();
     }
 
+    /// Returns the text in the text field.
     pub fn text<'a>(&'a self) -> &'a str {
         &self.text_utf8
     }
