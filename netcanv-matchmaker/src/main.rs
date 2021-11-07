@@ -1,12 +1,14 @@
 // the netcanv matchmaker server.
 // keeps track of open rooms and exchanges addresses between hosts and their clients
 
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::error;
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{AddrParseError, SocketAddr, TcpListener, TcpStream};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex, Weak};
+use tungstenite::{Message, WebSocket, accept};
 
 use netcanv_protocol::matchmaker::*;
 use thiserror::Error;
@@ -14,21 +16,20 @@ use thiserror::Error;
 /// Maximum possible room ID. This can be raised, if IDs ever run out.
 const MAX_ROOM_ID: u32 = 9999;
 
-/// A TCP stream, buffered writer, and buffered reader, packed into one thread-safe struct for
+/// A TCP stream and websocket packed into one thread-safe struct for
 /// convenience.
 struct BufStream {
    stream: TcpStream,
-   writer: Mutex<BufWriter<TcpStream>>,
-   reader: Mutex<BufReader<TcpStream>>,
+   websocket: Mutex<WebSocket<TcpStream>>,
 }
 
 impl BufStream {
    /// Creates a new BufStream from a TcpStream.
    fn new(stream: TcpStream) -> Result<Self, Error> {
       const MEGABYTE: usize = 1024 * 1024;
+
       Ok(Self {
-         writer: Mutex::new(BufWriter::with_capacity(2 * MEGABYTE, stream.try_clone()?)),
-         reader: Mutex::new(BufReader::with_capacity(2 * MEGABYTE, stream.try_clone()?)),
+         websocket: Mutex::new(accept(stream.try_clone()?).unwrap()),
          stream,
       })
    }
@@ -90,10 +91,16 @@ impl Matchmaker {
          Packet::Relayed(..) => (),
          packet => eprintln!("- sending packet {} -> {:?}", stream.peer_addr()?, packet),
       }
-      let mut writer = stream.writer.lock().unwrap();
-      let serialize_result = bincode::serialize_into(&mut *writer, packet);
-      let flush_result = writer.flush();
-      serialize_result.map_err(|e| e.into()).and(flush_result.map_err(|e| e.into()))
+
+      let ser_res = bincode::serialize(packet);
+
+      if ser_res.is_err() {
+         return Err(Error::Serialize(ser_res.err().unwrap()));
+      }
+
+      stream.websocket.lock().unwrap().write_message(Message::Binary(ser_res.unwrap())).unwrap();
+
+      Ok(())
    }
 
    /// Sends an error packet into the stream.
@@ -292,6 +299,7 @@ impl Matchmaker {
    fn start_client_thread(mm: Arc<Mutex<Self>>, tcp_stream: TcpStream) -> Result<(), Error> {
       let peer_addr = tcp_stream.peer_addr()?;
       let stream = Arc::new(BufStream::new(tcp_stream)?);
+
       eprintln!("* mornin' mr. {}", peer_addr);
       let _ = std::thread::spawn(move || {
          let mut running = true;
@@ -308,7 +316,10 @@ impl Matchmaker {
                   break;
                }
             }
-            let _ = bincode::deserialize_from(&mut *stream.reader.lock().unwrap()) // what
+
+            let msg = stream.websocket.lock().unwrap().read_message().unwrap().into_data();
+
+            let _ = bincode::deserialize(&msg) // what
                .map_err(|error| {
                   running = false;
                   Error::Serialize(error)
