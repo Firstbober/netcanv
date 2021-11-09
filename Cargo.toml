@@ -11,6 +11,7 @@ members = [
    "netcanv-renderer-skia",
    "netcanv-matchmaker",
    "netcanv-protocol",
+   "wasm-test-plugin"
 ]
 
 [features]
@@ -19,6 +20,9 @@ renderer-skia = ["netcanv-renderer-skia"]
 renderer-opengl = ["netcanv-renderer-opengl"]
 
 [dependencies]
+
+# Wasmer
+wasmer = "2.0"
 
 # Common things
 anyhow = "1.0.40"

@@ -1,6 +1,9 @@
 use std::collections::HashMap;
+use std::ffi::{CStr, CString};
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use native_dialog::FileDialog;
@@ -9,6 +12,8 @@ use netcanv_renderer::paws::{
 };
 use netcanv_renderer::{BlendMode, RenderBackend};
 use nysa::global as bus;
+use std::os::raw::c_char;
+use wasmer::{imports, Array, LazyInit, WasmPtr, WasmerEnv};
 
 use crate::app::*;
 use crate::assets::*;
@@ -56,6 +61,15 @@ enum ChunkDownload {
 /// A bus message requesting a chunk download.
 struct RequestChunkDownload((i32, i32));
 
+struct WasmBusLog(u32);
+
+#[derive(WasmerEnv, Clone)]
+struct ScriptingEnv {}
+
+struct ScriptingState {
+   instances: Vec<Rc<wasmer::Instance>>,
+}
+
 /// The paint app state.
 pub struct State {
    assets: Assets,
@@ -82,6 +96,8 @@ pub struct State {
 
    panning: bool,
    viewport: Viewport,
+
+   scripting_state: ScriptingState,
 }
 
 /// The palette of colors at the bottom of the screen.
@@ -143,7 +159,12 @@ impl State {
 
          panning: false,
          viewport: Viewport::new(),
+
+         scripting_state: ScriptingState {
+            instances: Vec::new(),
+         },
       };
+
       if this.peer.is_host() {
          log!(this.log, "Welcome to your room!");
          log!(
@@ -151,6 +172,39 @@ impl State {
             "To invite friends, send them the room ID shown in the bottom right corner of your screen."
          );
       }
+
+      let store = wasmer::Store::default();
+      let module = match wasmer::Module::new(
+         &store,
+         include_bytes!("../../target/wasm32-unknown-unknown/debug/wasm_test_plugin.wasm"),
+      ) {
+         Ok(module) => module,
+         Err(err) => std::panic::panic_any(err),
+      };
+
+      let import_object = imports! {
+         "env" => {
+            "print" => wasmer::Function::new_native(&store, move |content: WasmPtr<u8, Array>| -> () {
+               bus::push(WasmBusLog(content.offset()));
+            })
+         }
+      };
+
+      let instance = Rc::new(match wasmer::Instance::new(&module, &import_object) {
+         Ok(instance) => instance,
+         Err(err) => std::panic::panic_any(err),
+      });
+
+      this.scripting_state.instances.push(instance);
+
+      let wasm_greet_fn = this.scripting_state.instances[0]
+         .exports
+         .get_function("greet")
+         .unwrap()
+         .native::<(), ()>()
+         .unwrap();
+      wasm_greet_fn.call();
+
       this
    }
 
@@ -586,6 +640,19 @@ impl AppState for State {
          catch!(self.paint_canvas.save(None));
          eprintln!("autosave complete");
          self.last_autosave = Instant::now();
+      }
+
+      // WASM test messaging
+      for message in &bus::retrieve_all::<WasmBusLog>() {
+         let data = message.consume().0;
+         let memory = self.scripting_state.instances[0].exports.get_memory("memory").unwrap();
+
+         let new_ptr: WasmPtr<u8, Array> = WasmPtr::new(data);
+
+         unsafe {
+            let val = new_ptr.get_utf8_str_with_nul(memory).unwrap();
+            log!(self.log, "From wasm plugin: {}", val);
+         }
       }
 
       // Network
