@@ -2,11 +2,13 @@
 
 mod tools;
 
+use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use native_dialog::FileDialog;
@@ -15,6 +17,7 @@ use netcanv_renderer::paws::{
 };
 use netcanv_renderer::{BlendMode, RenderBackend};
 use nysa::global as bus;
+use rquickjs::HasRefs;
 
 use crate::app::paint::tools::KeyShortcutAction;
 use crate::app::*;
@@ -55,6 +58,8 @@ enum ChunkDownload {
 
 /// A bus message requesting a chunk download.
 struct RequestChunkDownload((i32, i32));
+
+struct ScriptingFunctionCalled<'a>(&'a str, Vec<Box<dyn Any + Send>>);
 
 /// The paint app state.
 pub struct State {
@@ -137,6 +142,22 @@ impl State {
             "To invite friends, send them the room ID shown in the bottom right corner of your screen."
          );
       }
+
+      let runtime = rquickjs::Runtime::new().unwrap();
+      let context = rquickjs::Context::full(&runtime).unwrap();
+
+      context.with(|ctx| {
+         let global = ctx.globals();
+
+         global.set(
+            "log",
+            rquickjs::Func::from(|content: String| {
+               bus::push(ScriptingFunctionCalled("log", vec![Box::new(content)]));
+            }),
+         );
+
+         let module = ctx.compile("simple_tool", include_str!("../../../simple_tool.js")).unwrap();
+      });
 
       this
    }
@@ -743,6 +764,21 @@ impl AppState for State {
       }
       for _ in &bus::retrieve_all::<Fatal>() {
          self.fatal_error = true;
+      }
+
+      for message in &bus::retrieve_all::<ScriptingFunctionCalled>() {
+         let function = message.consume();
+
+         match function.0 {
+            "log" => {
+               log!(
+                  self.log,
+                  "{}",
+                  function.1[0].downcast_ref::<String>().unwrap()
+               );
+            }
+            _ => {}
+         }
       }
 
       // Paint canvas

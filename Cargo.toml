@@ -20,6 +20,8 @@ renderer-opengl = ["netcanv-renderer-opengl"]
 
 [dependencies]
 
+rquickjs = "0.1.2"
+
 # Common things
 anyhow = "1.0.40"
 heapless = { version = "0.7.7", default-features = false }

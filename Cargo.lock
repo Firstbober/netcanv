@@ -1428,6 +1428,7 @@ dependencies = [
  "netcanv-renderer-skia",
  "nysa",
  "resvg",
+ "rquickjs",
  "serde",
  "tiny-skia",
  "toml",
@@ -2051,6 +2052,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf58a7d05b28e14b1e8902fa04c4d5d6109f5450ef71a5e6597f66e53f541504"
 dependencies = [
  "xmlparser",
+]
+
+[[package]]
+name = "rquickjs"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab88d188e9568c9afb1bbed97fe70de054092363e781f9e5837e862ee7dc78d4"
+dependencies = [
+ "rquickjs-core",
+]
+
+[[package]]
+name = "rquickjs-core"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e48cc5af396ad64a195bfbdc060de4205bdf62d30d0067e60b6d34be8ce0003"
+dependencies = [
+ "rquickjs-sys",
+]
+
+[[package]]
+name = "rquickjs-sys"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42e2860c67f99ebff17ff95ee559a40a34be4139e9186c929b98cfc3c0183a06"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
