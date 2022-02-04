@@ -7,6 +7,9 @@ edition = "2021"
 
 netcanv-protocol = { path = "../netcanv-protocol" }
 
+# WallhackRC
+whrc-common = { path = "../whrc-common" }
+
 tokio = { version = "1.14.0", features = ["full"] }
 tokio-tungstenite = "0.16.1"
 futures-util = { version = "0.3", features = ["sink", "std"] }

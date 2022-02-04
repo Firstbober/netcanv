@@ -1,0 +1,1 @@
+pub const WALLHACKRC_VERSION: &str = "2.0.0";

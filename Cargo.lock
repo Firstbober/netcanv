@@ -1186,6 +1186,7 @@ dependencies = [
  "usvg",
  "webbrowser",
  "webp",
+ "whrc-common",
 ]
 
 [[package]]
@@ -1211,6 +1212,7 @@ dependencies = [
  "structopt",
  "tokio",
  "tokio-tungstenite",
+ "whrc-common",
 ]
 
 [[package]]
@@ -2394,6 +2396,10 @@ dependencies = [
  "either",
  "libc",
 ]
+
+[[package]]
+name = "whrc-common"
+version = "0.1.0"
 
 [[package]]
 name = "widestring"

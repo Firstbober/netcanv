@@ -1,8 +1,5 @@
 use netcanv_renderer_opengl::winit::window::WindowBuilder;
-
 use crate::backend::Image;
-
-pub const WALLHACKRC_VERSION: &str = "2.0.0";
 
 // -------------
 // main.rs hooks
@@ -12,7 +9,7 @@ macro_rules! whrc_main_after_config {
    () => {
       log::info!(
          "WallhackRC {} - A rehydrated NetCanv expansion pack.",
-         whrc::WALLHACKRC_VERSION
+         whrc_common::WALLHACKRC_VERSION
       );
    };
 }
@@ -63,7 +60,7 @@ macro_rules! whrc_app_lobby_process_icon_panel {
          $input,
          &ButtonArgs::new($ui, &$assets.colors.action_button).height(32.0).pill().tooltip(
             &$assets.sans,
-            Tooltip::left(format!("WallhackRC {}", crate::whrc::WALLHACKRC_VERSION)),
+            Tooltip::left(format!("WallhackRC {}", whrc_common::WALLHACKRC_VERSION)),
          ),
          &$assets.icons.whrc.whrc_logo,
       )

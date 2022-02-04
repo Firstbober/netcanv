@@ -455,6 +455,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       env!("CARGO_PKG_VERSION"),
       relay::PROTOCOL_VERSION
    );
+   // WallhackRC
+   log::info!("WallhackRC {} - Rehydration complete, you can see through walls!", whrc_common::WALLHACKRC_VERSION);
    log::info!("listening on {}", listener.local_addr()?);
 
    loop {
