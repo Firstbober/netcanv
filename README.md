@@ -1,3 +1,9 @@
+# WallhackRC
+
+WallhackD reborn for newer NetCanv versions. Currently targeting 0.7.0.
+
+Features are slowy ported from WHD. Stay tuned.
+
 # NetCanv
 
 A lightweight app for painting with other people over the Internet, in real time.
