@@ -46,7 +46,7 @@ impl Chunk {
    // from 0.0 to 1.0.
    // 80% is a fairly sane default that preserves most of the image's quality while still retaining a
    // good compression ratio.
-   const WEBP_QUALITY: f32 = 80.0;
+   pub const WEBP_QUALITY: f32 = 80.0;
 
    /// Creates a new chunk, using the given canvas as a Skia surface allocator.
    fn new(renderer: &mut Backend) -> Self {
@@ -66,7 +66,8 @@ impl Chunk {
    }
 
    /// Downloads the image of the chunk from the graphics card.
-   fn download_image(&self) -> RgbaImage {
+   /// WallhackRC added pub for usage in tools.
+   pub fn download_image(&self) -> RgbaImage {
       let mut image_buffer =
          ImageBuffer::from_pixel(Self::SIZE.0, Self::SIZE.1, Rgba([0, 0, 0, 0]));
       self.framebuffer.download_rgba((0, 0), self.framebuffer.size(), &mut image_buffer);
@@ -183,7 +184,8 @@ impl Chunk {
 
 /// A paint canvas built out of [`Chunk`]s.
 pub struct PaintCanvas {
-   chunks: HashMap<(i32, i32), Chunk>,
+   // WallhackRC added pub for usage in tools
+   pub chunks: HashMap<(i32, i32), Chunk>,
    /// The path to the `.netcanv` directory this paint canvas was saved to.
    filename: Option<PathBuf>,
 
@@ -244,14 +246,16 @@ impl PaintCanvas {
    }
 
    /// Creates the chunk at the given position, if it doesn't already exist.
+   /// WallhackRC added pub so it can be used in tools
    #[must_use]
-   fn ensure_chunk(&mut self, renderer: &mut Backend, position: (i32, i32)) -> &mut Chunk {
+   pub fn ensure_chunk(&mut self, renderer: &mut Backend, position: (i32, i32)) -> &mut Chunk {
       self.chunks.entry(position).or_insert_with(|| Chunk::new(renderer))
    }
 
    /// Returns the left, top, bottom, right sides covered by the rectangle, in chunk
    /// coordinates.
-   fn chunk_coverage(coverage: Rect) -> (i32, i32, i32, i32) {
+   /// WallhackRC added pub for usage in tools
+   pub fn chunk_coverage(coverage: Rect) -> (i32, i32, i32, i32) {
       let coverage = coverage.sort();
       (
          (coverage.left() / Chunk::SIZE.0 as f32).floor() as i32,

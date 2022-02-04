@@ -832,8 +832,9 @@ impl PeerSelection {
 }
 
 /// A network packet for the selection tool.
+/// WallhackRC modified adding pub for usage in other tools
 #[derive(Serialize, Deserialize)]
-enum Packet {
+pub enum Packet {
    /// The selection rectangle.
    Rect {
       position: (f32, f32),

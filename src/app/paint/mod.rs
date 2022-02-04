@@ -2,7 +2,8 @@
 
 mod actions;
 pub mod tool_bar;
-mod tools;
+// pub is required here so WallhackRC internals can create tools
+pub mod tools;
 
 use instant::{Duration, Instant};
 use std::collections::HashMap;
@@ -21,7 +22,7 @@ use tokio::sync::mpsc;
 use crate::app::paint::actions::ActionArgs;
 use crate::app::paint::tool_bar::ToolbarArgs;
 use crate::app::paint::tools::KeyShortcutAction;
-use crate::app::*;
+use crate::{app::*, whrc_app_paint_tool_bar_register_tools};
 use crate::assets::*;
 use crate::backend::Backend;
 use crate::clipboard;
@@ -220,6 +221,8 @@ impl State {
          self.toolbar.add_tool(SelectionTool::new(renderer, Arc::clone(&self.runtime)));
       let brush = self.toolbar.add_tool(BrushTool::new(renderer));
       let _eyedropper = self.toolbar.add_tool(EyedropperTool::new(renderer));
+
+      whrc_app_paint_tool_bar_register_tools!(self.toolbar, renderer);
 
       // Set the default tool to the brush.
       self.toolbar.set_current_tool(brush);

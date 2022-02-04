@@ -17,7 +17,7 @@ use crate::ui::{
 };
 
 // WallhackRC
-use crate::whrc_assets_icons_new;
+use crate::whrc_assets_new_icons;
 
 const SANS_TTF: &[u8] = include_bytes!("assets/fonts/Barlow-Medium.ttf");
 const SANS_BOLD_TTF: &[u8] = include_bytes!("assets/fonts/Barlow-Bold.ttf");
@@ -225,7 +225,7 @@ impl Assets {
                pin: Self::load_svg(renderer, WINDOW_PIN_SVG),
                pinned: Self::load_svg(renderer, WINDOW_PINNED_SVG),
             },
-            whrc: whrc_assets_icons_new!(renderer)
+            whrc: whrc_assets_new_icons!(renderer)
          },
 
          banner: Banner {

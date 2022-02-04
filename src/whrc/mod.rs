@@ -1,4 +1,5 @@
 use netcanv_renderer_opengl::winit::window::WindowBuilder;
+
 use crate::backend::Image;
 
 // -------------
@@ -24,25 +25,23 @@ pub fn whrc_main_window_builder(b: WindowBuilder) -> WindowBuilder {
 // ---------------
 // assets.rs hooks
 
-
-
-// assets.rs hooks
-// ---------------
-
-pub const WHRC_LOGO: &[u8] = include_bytes!("whrc/assets/wallhackrc.svg");
+pub const WHRC_LOGO: &[u8] = include_bytes!("./assets/wallhackrc.svg");
 
 pub struct WallhackRCIcons {
-	pub whrc_logo: Image
+   pub whrc_logo: Image,
 }
 
 #[macro_export]
-macro_rules! whrc_assets_icons_new {
-	($renderer: expr) => {
-		crate::whrc::WallhackRCIcons {
-			whrc_logo: Self::load_svg($renderer, crate::whrc::WHRC_LOGO)
-		}
-	};
+macro_rules! whrc_assets_new_icons {
+   ($renderer: expr) => {
+      crate::whrc::WallhackRCIcons {
+         whrc_logo: Self::load_svg($renderer, crate::whrc::WHRC_LOGO),
+      }
+   };
 }
+
+// assets.rs hooks
+// ---------------
 
 // ------------------
 // app/lobby.rs hooks
@@ -71,3 +70,22 @@ macro_rules! whrc_app_lobby_process_icon_panel {
 
 // app/lobby.rs hooks
 // ------------------
+
+// ---------------------------
+// app/paint/tool_bar.rs hooks
+
+pub mod tools;
+
+#[macro_export]
+macro_rules! whrc_app_paint_tool_bar_register_tools {
+   ($toolbar: expr, $renderer: expr) => {
+      use crate::whrc::tools;
+
+      $toolbar.add_tool(tools::paste_large_images::WHRCToolPasteLargeImages::new(
+         $renderer,
+      ))
+   };
+}
+
+// app/paint/tool_bar.rs hooks
+// ---------------------------
