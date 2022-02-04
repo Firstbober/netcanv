@@ -76,6 +76,9 @@ mod token;
 mod ui;
 mod viewport;
 
+// WallhackRC
+mod whrc;
+
 use app::*;
 use assets::*;
 use config::config;
@@ -89,6 +92,7 @@ fn inner_main() -> anyhow::Result<()> {
 
    // Load user configuration.
    config::load_or_create()?;
+   whrc_main_after_config!();
 
    // Set up the winit event loop and open the window.
    log::debug!("opening window");
@@ -107,6 +111,8 @@ fn inner_main() -> anyhow::Result<()> {
       // our window apart from others.
       #[cfg(target_os = "linux")]
       let b = b.with_app_id("netcanv".into());
+
+      let b = whrc::whrc_main_window_builder(b);
 
       b
    };

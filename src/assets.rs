@@ -16,6 +16,9 @@ use crate::ui::{
    TextFieldColors,
 };
 
+// WallhackRC
+use crate::whrc_assets_icons_new;
+
 const SANS_TTF: &[u8] = include_bytes!("assets/fonts/Barlow-Medium.ttf");
 const SANS_BOLD_TTF: &[u8] = include_bytes!("assets/fonts/Barlow-Bold.ttf");
 const MONOSPACE_TTF: &[u8] = include_bytes!("assets/fonts/RobotoMono-Medium.ttf");
@@ -129,6 +132,9 @@ pub struct Icons {
    pub file: FileIcons,
    pub peer: PeerIcons,
    pub window: WindowIcons,
+
+   // WallhackRC
+   pub whrc: crate::whrc::WallhackRCIcons,
 }
 
 /// Banner layers.
@@ -219,6 +225,7 @@ impl Assets {
                pin: Self::load_svg(renderer, WINDOW_PIN_SVG),
                pinned: Self::load_svg(renderer, WINDOW_PINNED_SVG),
             },
+            whrc: whrc_assets_icons_new!(renderer)
          },
 
          banner: Banner {

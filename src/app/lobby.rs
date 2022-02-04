@@ -20,6 +20,9 @@ use crate::net::socket::SocketSystem;
 use crate::ui::view::View;
 use crate::ui::*;
 
+use crate::whrc::WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT;
+use crate::whrc_app_lobby_process_icon_panel;
+
 /// Colors used in the lobby screen.
 #[derive(Clone)]
 pub struct LobbyColors {
@@ -93,7 +96,12 @@ impl State {
             Self::VIEW_BOX_WIDTH,
             Self::BANNER_HEIGHT + Self::VIEW_BOX_HEIGHT + Self::STATUS_HEIGHT,
          )),
-         panel_view: View::new((40.0, 12.0 + 2.0 * 32.0)),
+         panel_view: View::new((
+            40.0,
+            (WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT * 32.0)
+               + 12.0
+               + ((WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT - 1.0) as f32 * 2.0),
+         )),
 
          status: Status::None,
          peer: None,
@@ -460,6 +468,8 @@ impl State {
       {
          catch!(assets::open_license_page());
       }
+
+      whrc_app_lobby_process_icon_panel!(ui, input, self.assets);
    }
 
    /// Checks whether a nickname is valid.
