@@ -85,6 +85,37 @@ use config::config;
 use simple_logger::SimpleLogger;
 use ui::{Input, Ui};
 
+struct PluginMetadata {
+   name: String,
+   author: String,
+   version: String,
+}
+
+impl<'js> rquickjs::FromJs<'js> for PluginMetadata {
+   fn from_js(_ctx: rquickjs::Ctx<'js>, value: rquickjs::Value<'js>) -> rquickjs::Result<Self> {
+      let ob = match value.as_object() {
+         Some(o) => o,
+         None => {
+            return Err(rquickjs::Error::FromJs {
+               from: value.type_name(),
+               to: "PluginMetadata",
+               message: Some("Conversion failed, value is not an object".into()),
+            })
+         }
+      };
+
+      let name = ob.get::<&str, String>("name")?;
+      let author = ob.get::<&str, String>("author")?;
+      let version = ob.get::<&str, String>("version")?;
+
+      Ok(PluginMetadata {
+         name,
+         author,
+         version,
+      })
+   }
+}
+
 fn inner_main() -> anyhow::Result<()> {
    // Set up logging.
    SimpleLogger::new().with_level(LevelFilter::Debug).env().init()?;
@@ -93,6 +124,42 @@ fn inner_main() -> anyhow::Result<()> {
    // Load user configuration.
    config::load_or_create()?;
    whrc_main_after_config!();
+
+   let runtime = rquickjs::Runtime::new().unwrap();
+   let context = rquickjs::Context::full(&runtime).unwrap();
+
+   context.with(|ctx| {
+      let global = ctx.globals();
+
+      global
+         .set(
+            "log",
+            rquickjs::Func::from(|content: String| {
+               log::info!("{}", content);
+            }),
+         )
+         .unwrap();
+
+      let module = ctx.compile("test_tool", include_str!("../test_tool.js")).unwrap();
+      let metadata = module.get::<&str, PluginMetadata>("plugin_metadata");
+
+      match metadata {
+         Ok(metadata) => {
+            println!("Plugin name: {}", metadata.name);
+            println!("Plugin author: {}", metadata.author);
+            println!("Plugin version: {}", metadata.version);
+         }
+         Err(error) => {
+            log::error!("While loading plugin found error {}.", error);
+         }
+      }
+
+      let init_caps = rquickjs::Object::new(ctx).unwrap();
+      init_caps.set("create_tool", "eeee").unwrap();
+
+      let fcn = module.get::<&str, rquickjs::Function>("initialize").unwrap();
+      fcn.call::<_, ()>((rquickjs::This(init_caps), rquickjs::Undefined)).unwrap();
+   });
 
    // Set up the winit event loop and open the window.
    log::debug!("opening window");

@@ -1174,6 +1174,7 @@ dependencies = [
  "nysa",
  "once_cell",
  "resvg",
+ "rquickjs",
  "serde",
  "simple_logger",
  "strum",
@@ -1678,6 +1679,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf58a7d05b28e14b1e8902fa04c4d5d6109f5450ef71a5e6597f66e53f541504"
 dependencies = [
  "xmlparser",
+]
+
+[[package]]
+name = "rquickjs"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "052dae717f91183bee044637a6ed5070b8e8504e50fd4f3e489d4ba132f014cf"
+dependencies = [
+ "rquickjs-core",
+]
+
+[[package]]
+name = "rquickjs-core"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb480004c1950ad7ad9cca17d31465151c805af93ffcef1f75721002b14d4b15"
+dependencies = [
+ "rquickjs-sys",
+]
+
+[[package]]
+name = "rquickjs-sys"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9db0df426984adedeb77e8e5e33e7fb221417ccb64397194ee878b1bb1766ee2"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

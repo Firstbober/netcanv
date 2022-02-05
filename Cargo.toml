@@ -70,6 +70,7 @@ netcanv-renderer-opengl = { path = "netcanv-renderer-opengl", optional = true }
 netcanv-protocol = { path = "netcanv-protocol" }
 
 whrc-common = { path = "whrc-common" }
+rquickjs = "0.1.4"
 
 [profile.release]
 lto = "fat"
