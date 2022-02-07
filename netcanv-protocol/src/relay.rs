@@ -57,6 +57,12 @@ pub enum Packet {
    // ---
    /// An error occured.
    Error(Error),
+
+   // ---
+   // WHRC
+   // ---
+   /// Host room with custom RoomId,
+   WHRCHostCustomId(RoomId)
 }
 
 /// The unique ID of a room.

@@ -9,10 +9,11 @@ use tokio::sync::oneshot;
 use super::socket::{Socket, SocketSystem};
 use crate::common::Fatal;
 use crate::token::Token;
+use crate::whrc_net_peer_connected_to_relay;
 
 /// A unique token identifying a peer connection.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PeerToken(usize);
+pub struct PeerToken(pub usize);
 
 /// A message that a peer connection has been successfully established.
 pub struct Connected {
@@ -61,7 +62,8 @@ pub struct Mate {
    pub tool: Option<String>,
 }
 
-enum State {
+// WallhackRC pub for internal purposes.
+pub enum State {
    WaitingForRelay(oneshot::Receiver<anyhow::Result<Socket>>),
    ConnectedToRelay,
    InRoom,
@@ -69,20 +71,22 @@ enum State {
 
 /// A connection to the relay.
 pub struct Peer {
-   token: PeerToken,
-   state: State,
-   relay_socket: Option<Socket>,
+   // WallhackRC pub for internal purposes.
+   pub token: PeerToken,
+   pub state: State,
+   pub relay_socket: Option<Socket>,
 
-   is_host: bool,
+   pub is_host: bool,
 
-   nickname: String,
-   room_id: Option<RoomId>,
-   peer_id: Option<PeerId>,
-   host: Option<PeerId>,
-   mates: HashMap<PeerId, Mate>,
+   pub nickname: String,
+   pub room_id: Option<RoomId>,
+   pub peer_id: Option<PeerId>,
+   pub host: Option<PeerId>,
+   pub mates: HashMap<PeerId, Mate>,
 }
 
-static PEER_TOKEN: Token = Token::new(0);
+// WallhackRC pub for internal purposes.
+pub static PEER_TOKEN: Token = Token::new(0);
 
 impl Peer {
    /// Host a new room on the given relay server.
@@ -173,11 +177,7 @@ impl Peer {
       self.state = State::ConnectedToRelay;
       log::info!("connected to relay");
       self.relay_socket = Some(socket);
-      self.send_to_relay(if self.is_host {
-         relay::Packet::Host
-      } else {
-         relay::Packet::Join(self.room_id.unwrap())
-      })?;
+      whrc_net_peer_connected_to_relay!(self);
       Ok(())
    }
 

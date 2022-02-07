@@ -18,8 +18,10 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{accept_async, tungstenite, WebSocketStream};
 
-type Sink = SplitSink<WebSocketStream<TcpStream>, Message>;
-type Stream = SplitStream<WebSocketStream<TcpStream>>;
+mod whrc;
+// WallhackRC pub for internal purposes.
+pub type Sink = SplitSink<WebSocketStream<TcpStream>, Message>;
+pub type Stream = SplitStream<WebSocketStream<TcpStream>>;
 
 #[derive(StructOpt)]
 #[structopt(name = "netcanv-relay")]
@@ -178,7 +180,8 @@ impl Peers {
    }
 }
 
-struct State {
+// WallhackRC pub for internal purposes.
+pub struct State {
    rooms: Rooms,
    peers: Peers,
 }
@@ -327,6 +330,7 @@ async fn handle_packet(
       Packet::Relayed(_peer_id, _data) => (),
       Packet::Disconnected(_peer_id) => (),
       Packet::Error(_message) => (),
+      _ => whrc_handle_packets!(packet, write, address, state),
    }
    Ok(())
 }
@@ -456,7 +460,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       relay::PROTOCOL_VERSION
    );
    // WallhackRC
-   log::info!("WallhackRC {} - Rehydration complete, you can see through walls!", whrc_common::WALLHACKRC_VERSION);
+   log::info!(
+      "WallhackRC {} - Rehydration complete, you can see through walls!",
+      whrc_common::WALLHACKRC_VERSION
+   );
    log::info!("listening on {}", listener.local_addr()?);
 
    loop {

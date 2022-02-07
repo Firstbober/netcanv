@@ -4,6 +4,11 @@ WallhackD reborn for newer NetCanv versions. Currently targeting 0.7.0.
 
 Features are slowy ported from WHD. Stay tuned.
 
+Features included:
+
+- Pasting large images.
+- Custom room ID with WHRC relay.
+
 # NetCanv
 
 A lightweight app for painting with other people over the Internet, in real time.

@@ -18,10 +18,13 @@ use crate::config::{self, config};
 use crate::net::peer::{self, Peer};
 use crate::net::socket::SocketSystem;
 use crate::ui::view::View;
-use crate::ui::*;
+use crate::{ui::*, whrc_app_lobby_host_room};
 
-use crate::whrc::WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT;
-use crate::whrc_app_lobby_process_icon_panel;
+use crate::whrc::{WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT, WHRCAppLobbyHostRoomArgs, WHRCPeerFuncs};
+use crate::{
+   whrc_app_lobby_process_icon_panel, whrc_app_lobby_process_menu_host_expand_horizontal,
+   whrc_app_lobby_macro_host_room
+};
 
 /// Colors used in the lobby screen.
 #[derive(Clone)]
@@ -330,10 +333,12 @@ impl State {
          macro_rules! host_room {
             () => {
                self.status = Status::Info("Connecting…".into());
+               let whrc_host_args = whrc_app_lobby_macro_host_room!(self);
                match Self::host_room(
                   Arc::clone(&self.socket_system),
                   self.nickname_field.text(),
                   self.relay_field.text(),
+                  whrc_host_args
                ) {
                   Ok(peer) => self.peer = Some(peer),
                   Err(status) => self.status = status,
@@ -342,6 +347,7 @@ impl State {
          }
 
          ui.push((ui.remaining_width(), 32.0), Layout::Horizontal);
+         whrc_app_lobby_process_menu_host_expand_horizontal!(self, ui, input, self.assets);
          if Button::with_text(ui, input, &button, &self.assets.sans, "Host").clicked() {
             host_room!();
          }
@@ -490,9 +496,10 @@ impl State {
       socket_system: Arc<SocketSystem>,
       nickname: &str,
       relay_addr_str: &str,
+      whrc_host_args: WHRCAppLobbyHostRoomArgs
    ) -> Result<Peer, Status> {
       Self::validate_nickname(nickname)?;
-      Ok(Peer::host(socket_system, nickname, relay_addr_str))
+      whrc_app_lobby_host_room!(self, socket_system, nickname, relay_addr_str, whrc_host_args)
    }
 
    /// Establishes a connection to the relay and joins an existing room.
