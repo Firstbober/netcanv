@@ -9,10 +9,13 @@ use std::path::PathBuf;
 use std::sync::{RwLock, RwLockReadGuard};
 
 use directories::ProjectDirs;
+use netcanv_i18n::unic_langid::LanguageIdentifier;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 
+use crate::assets::Assets;
 use crate::keymap::Keymap;
+use crate::Error;
 
 /// Saved values of lobby text boxes.
 #[derive(Deserialize, Serialize)]
@@ -65,6 +68,9 @@ pub struct WindowConfig {
 /// A user `config.toml` file.
 #[derive(Deserialize, Serialize)]
 pub struct UserConfig {
+   #[serde(default = "default_language")]
+   pub language: String,
+
    pub lobby: LobbyConfig,
    pub ui: UiConfig,
    pub window: Option<WindowConfig>,
@@ -90,7 +96,7 @@ impl UserConfig {
    ///
    /// If the `config.toml` doesn't exist, it's created with values inherited from
    /// `UserConfig::default`.
-   fn load_or_create() -> anyhow::Result<Self> {
+   fn load_or_create() -> netcanv::Result<Self> {
       let config_dir = Self::config_dir();
       let config_file = Self::path();
       log::info!("loading config from {:?}", config_file);
@@ -117,7 +123,7 @@ impl UserConfig {
    }
 
    /// Saves the user configuration to the `config.toml` file.
-   fn save(&self) -> anyhow::Result<()> {
+   fn save(&self) -> netcanv::Result<()> {
       // Assumes that `config_dir` was already created in `load_or_create`.
       let config_file = Self::path();
       std::fs::write(&config_file, toml::to_string(self)?)?;
@@ -128,6 +134,7 @@ impl UserConfig {
 impl Default for UserConfig {
    fn default() -> Self {
       Self {
+         language: default_language(),
          lobby: LobbyConfig {
             nickname: "Anon".to_owned(),
             relay: "ws://localhost".to_owned(),
@@ -142,19 +149,45 @@ impl Default for UserConfig {
    }
 }
 
+fn default_language() -> String {
+   fn inner() -> Option<String> {
+      log::info!("language not yet determined, checking locale");
+      let locale = sys_locale::get_locale()?;
+      log::info!("got locale identifier: {}", locale);
+      let mut identifier: LanguageIdentifier = locale.parse().ok()?;
+      log::info!("trying full identifier: {}", identifier);
+      if Assets::load_language(Some(&identifier.to_string())).is_ok() {
+         return Some(identifier.to_string());
+      }
+      identifier.region = None;
+      log::info!("trying without region: {}", identifier);
+      if Assets::load_language(Some(&identifier.to_string())).is_ok() {
+         return Some(identifier.to_string());
+      }
+      identifier.script = None;
+      log::info!("trying without script: {}", identifier);
+      if Assets::load_language(Some(&identifier.to_string())).is_ok() {
+         return Some(identifier.to_string());
+      }
+      log::error!("system language not available, falling back to en-US");
+      None
+   }
+   inner().unwrap_or_else(|| "en-US".to_string())
+}
+
 static CONFIG: OnceCell<RwLock<UserConfig>> = OnceCell::new();
 
 /// Loads or creates the user config.
-pub fn load_or_create() -> anyhow::Result<()> {
+pub fn load_or_create() -> netcanv::Result<()> {
    let config = UserConfig::load_or_create()?;
    if CONFIG.set(RwLock::new(config)).is_err() {
-      anyhow::bail!("the user config is already loaded");
+      return Err(Error::ConfigIsAlreadyLoaded);
    }
    Ok(())
 }
 
 /// Saves the user config.
-pub fn save() -> anyhow::Result<()> {
+pub fn save() -> netcanv::Result<()> {
    config().save()
 }
 

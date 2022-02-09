@@ -4,6 +4,7 @@ use std::ops::Deref;
 
 use crate::assets::Assets;
 use crate::backend::{Backend, Image};
+use crate::common::serialize_bincode;
 use crate::keymap::KeyBinding;
 use crate::net::peer::Peer;
 use crate::paint_canvas::PaintCanvas;
@@ -70,6 +71,9 @@ pub trait Tool {
       KeyShortcutAction::None
    }
 
+   /// Processes background jobs like image decoding.
+   fn process_background_jobs(&mut self, _args: ToolArgs, _paint_canvas: &mut PaintCanvas) {}
+
    /// Called before the paint canvas is rendered to the screen. Primarily used for drawing to the
    /// paint canvas, or updating related state.
    ///
@@ -121,7 +125,7 @@ pub trait Tool {
    fn process_bottom_bar(&mut self, _args: ToolArgs) {}
 
    /// Called when network packets should be sent.
-   fn network_send(&mut self, _net: Net, _global_controls: &GlobalControls) -> anyhow::Result<()> {
+   fn network_send(&mut self, _net: Net, _global_controls: &GlobalControls) -> netcanv::Result<()> {
       Ok(())
    }
 
@@ -133,7 +137,7 @@ pub trait Tool {
       _paint_canvas: &mut PaintCanvas,
       _peer_id: PeerId,
       _payload: Vec<u8>,
-   ) -> anyhow::Result<()> {
+   ) -> netcanv::Result<()> {
       Ok(())
    }
 
@@ -141,14 +145,14 @@ pub trait Tool {
    ///
    /// This can be used to let the peer know what's happening at the moment they joined,
    /// eg. in the selection tool this is used to send them the current capture.
-   fn network_peer_join(&mut self, _net: Net, _peer_id: PeerId) -> anyhow::Result<()> {
+   fn network_peer_join(&mut self, _net: Net, _peer_id: PeerId) -> netcanv::Result<()> {
       Ok(())
    }
 
    /// Called when a peer has selected this tool.
    ///
    /// This can be used to initialize the tool's state for the peer.
-   fn network_peer_activate(&mut self, _net: Net, _peer_id: PeerId) -> anyhow::Result<()> {
+   fn network_peer_activate(&mut self, _net: Net, _peer_id: PeerId) -> netcanv::Result<()> {
       Ok(())
    }
 
@@ -162,7 +166,7 @@ pub trait Tool {
       _net: Net,
       _paint_canvas: &mut PaintCanvas,
       _peer_id: PeerId,
-   ) -> anyhow::Result<()> {
+   ) -> netcanv::Result<()> {
       Ok(())
    }
 }
@@ -180,11 +184,11 @@ impl<'peer> Net<'peer> {
    }
 
    /// Sends a tool packet.
-   pub fn send<T>(&self, tool: &impl Tool, peer_id: PeerId, payload: T) -> anyhow::Result<()>
+   pub fn send<T>(&self, tool: &impl Tool, peer_id: PeerId, payload: T) -> netcanv::Result<()>
    where
       T: 'static + Serialize,
    {
-      let payload = bincode::serialize(&payload)?;
+      let payload = serialize_bincode(&payload)?;
       self.peer.send_tool(peer_id, tool.name().to_owned(), payload)?;
       Ok(())
    }

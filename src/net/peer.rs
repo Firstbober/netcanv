@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -7,8 +8,10 @@ use nysa::global as bus;
 use tokio::sync::oneshot;
 
 use super::socket::{Socket, SocketSystem};
-use crate::common::Fatal;
+use crate::common::{deserialize_bincode, serialize_bincode, Fatal};
 use crate::token::Token;
+use crate::Error;
+
 use crate::whrc_net_peer_connected_to_relay;
 
 /// A unique token identifying a peer connection.
@@ -64,7 +67,7 @@ pub struct Mate {
 
 // WallhackRC pub for internal purposes.
 pub enum State {
-   WaitingForRelay(oneshot::Receiver<anyhow::Result<Socket>>),
+   WaitingForRelay(oneshot::Receiver<netcanv::Result<Socket>>),
    ConnectedToRelay,
    InRoom,
 }
@@ -128,23 +131,23 @@ impl Peer {
 
    /// Sends a relay packet to the currently connected relay, or fails if there's no
    /// relay connection.
-   fn send_to_relay(&self, packet: relay::Packet) -> anyhow::Result<()> {
+   fn send_to_relay(&self, packet: relay::Packet) -> netcanv::Result<()> {
       match &self.state {
          State::ConnectedToRelay | State::InRoom => {
             self.relay_socket.as_ref().unwrap().send(packet);
          }
-         _ => anyhow::bail!("Cannot send packet: not connected to the relay"),
+         _ => return Err(Error::NotConnectedToRelay),
       }
       Ok(())
    }
 
    /// Sends a client packet to the peer with the given address.
-   fn send_to_client(&self, to: PeerId, packet: cl::Packet) -> anyhow::Result<()> {
+   fn send_to_client(&self, to: PeerId, packet: cl::Packet) -> netcanv::Result<()> {
       match &self.state {
          State::InRoom => {
-            self.send_to_relay(relay::Packet::Relay(to, bincode::serialize(&packet)?))?;
+            self.send_to_relay(relay::Packet::Relay(to, serialize_bincode(&packet)?))?;
          }
-         _ => anyhow::bail!("Cannot send packet: not connected to the host"),
+         _ => return Err(Error::NotConnectedToHost),
       }
       Ok(())
    }
@@ -158,7 +161,7 @@ impl Peer {
    }
 
    /// Checks the message bus for any established connections.
-   fn poll_for_new_connections(&mut self) -> anyhow::Result<()> {
+   fn poll_for_new_connections(&mut self) -> netcanv::Result<()> {
       if let State::WaitingForRelay(socket) = &mut self.state {
          if let Ok(socket) = socket.try_recv() {
             let socket = catch!(socket, as Fatal, return Ok(()));
@@ -173,7 +176,7 @@ impl Peer {
    ///
    /// In the process, sends the appropriate packet to the relay - whether to host or join a
    /// room.
-   fn connected_to_relay(&mut self, socket: Socket) -> anyhow::Result<()> {
+   fn connected_to_relay(&mut self, socket: Socket) -> netcanv::Result<()> {
       self.state = State::ConnectedToRelay;
       log::info!("connected to relay");
       self.relay_socket = Some(socket);
@@ -182,7 +185,7 @@ impl Peer {
    }
 
    /// Polls for any incoming packets.
-   fn poll_for_incoming_packets(&mut self) -> anyhow::Result<()> {
+   fn poll_for_incoming_packets(&mut self) -> netcanv::Result<()> {
       match &self.state {
          State::WaitingForRelay(_) => (),
          State::ConnectedToRelay | State::InRoom => {
@@ -195,7 +198,7 @@ impl Peer {
    }
 
    /// Handles a relay packet.
-   fn relay_packet(&mut self, packet: relay::Packet) -> anyhow::Result<()> {
+   fn relay_packet(&mut self, packet: relay::Packet) -> netcanv::Result<()> {
       match packet {
          relay::Packet::RoomCreated(room_id, peer_id) => {
             log::info!("got free room ID: {:?}", room_id);
@@ -225,7 +228,7 @@ impl Peer {
             }
          }
          relay::Packet::Relayed(author, payload) => {
-            let client_packet: cl::Packet = bincode::deserialize(&payload)?;
+            let client_packet: cl::Packet = deserialize_bincode(&payload)?;
             self.client_packet(author, client_packet)?;
          }
          relay::Packet::Disconnected(address) => {
@@ -237,19 +240,19 @@ impl Peer {
                });
             }
          }
-         relay::Packet::Error(error) => anyhow::bail!("{}", relay_error_to_string(error)),
-         other => anyhow::bail!("unexpected relay packet: {:?}", other),
+         relay::Packet::Error(error) => return Err(Error::Relay(error)),
+         _ => return Err(Error::UnexpectedRelayPacket),
       }
       Ok(())
    }
 
    /// Says hello to other peers in the room.
-   fn say_hello(&self) -> anyhow::Result<()> {
+   fn say_hello(&self) -> netcanv::Result<()> {
       self.send_to_client(PeerId::BROADCAST, cl::Packet::Hello(self.nickname.clone()))
    }
 
    /// Decodes a client packet.
-   fn client_packet(&mut self, author: PeerId, packet: cl::Packet) -> anyhow::Result<()> {
+   fn client_packet(&mut self, author: PeerId, packet: cl::Packet) -> netcanv::Result<()> {
       match packet {
          // -----
          // 0.1.0
@@ -270,7 +273,11 @@ impl Peer {
          // 0.2.0
          // -----
          cl::Packet::Version(version) if !cl::compatible_with(version) => {
-            bus::push(Fatal(anyhow::anyhow!("Client is too old.")));
+            bus::push(Fatal(match cl::PROTOCOL_VERSION.cmp(&version) {
+               Ordering::Less => Error::ClientIsTooOld,
+               Ordering::Greater => Error::ClientIsTooNew,
+               Ordering::Equal => unreachable!(),
+            }));
          }
          cl::Packet::Version(_) => (),
          cl::Packet::ChunkPositions(positions) => {
@@ -303,7 +310,7 @@ impl Peer {
    }
 
    /// Ticks the peer's network connection.
-   pub fn communicate(&mut self) -> anyhow::Result<()> {
+   pub fn communicate(&mut self) -> netcanv::Result<()> {
       self.poll_for_new_connections()?;
       self.poll_for_incoming_packets()?;
       Ok(())
@@ -325,12 +332,12 @@ impl Peer {
       &self,
       to: PeerId,
       positions: Vec<(i32, i32)>,
-   ) -> anyhow::Result<()> {
+   ) -> netcanv::Result<()> {
       self.send_to_client(to, cl::Packet::ChunkPositions(positions))
    }
 
    /// Requests chunk data from the host.
-   pub fn download_chunks(&self, positions: Vec<(i32, i32)>) -> anyhow::Result<()> {
+   pub fn download_chunks(&self, positions: Vec<(i32, i32)>) -> netcanv::Result<()> {
       assert!(self.host.is_some(), "only non-hosts can download chunks");
       log::info!("downloading {} chunks from the host", positions.len());
       // The host should be available at this point, as the connection has been established.
@@ -338,17 +345,21 @@ impl Peer {
    }
 
    /// Sends chunks to the given peer.
-   pub fn send_chunks(&self, to: PeerId, chunks: Vec<((i32, i32), Vec<u8>)>) -> anyhow::Result<()> {
+   pub fn send_chunks(
+      &self,
+      to: PeerId,
+      chunks: Vec<((i32, i32), Vec<u8>)>,
+   ) -> netcanv::Result<()> {
       self.send_to_client(to, cl::Packet::Chunks(chunks))
    }
 
    /// Sends a tool-specific packet.
-   pub fn send_tool(&self, peer_id: PeerId, name: String, payload: Vec<u8>) -> anyhow::Result<()> {
+   pub fn send_tool(&self, peer_id: PeerId, name: String, payload: Vec<u8>) -> netcanv::Result<()> {
       self.send_to_client(peer_id, cl::Packet::Tool(name, payload))
    }
 
    /// Sends a tool selection packet.
-   pub fn send_select_tool(&self, name: String) -> anyhow::Result<()> {
+   pub fn send_select_tool(&self, name: String) -> netcanv::Result<()> {
       self.send_to_client(PeerId::BROADCAST, cl::Packet::SelectTool(name))
    }
 
@@ -382,18 +393,5 @@ impl Peer {
    /// Returns the list of peers connected to the same room.
    pub fn mates(&self) -> &HashMap<PeerId, Mate> {
       &self.mates
-   }
-}
-
-fn relay_error_to_string(error: relay::Error) -> &'static str {
-   match error {
-      relay::Error::NoFreeRooms => "Could not find any more free rooms. Try again",
-      // Hopefully this one never happens.
-      relay::Error::NoFreePeerIDs => "The relay server is full. Try a different server",
-      relay::Error::RoomDoesNotExist => {
-         "No room with the given ID. Check if you spelled the ID correctly"
-      }
-      // This one also shouldn't happen.
-      relay::Error::NoSuchPeer => "Internal error: No such peer",
    }
 }

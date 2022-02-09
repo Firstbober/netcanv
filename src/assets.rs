@@ -1,20 +1,27 @@
 //! Handling of assets such as icons, fonts, etc.
 
 use std::io::{Cursor, Write};
+use std::ops::Deref;
 
-use anyhow::Context;
+use netcanv_i18n::from_language::FromLanguage;
+use netcanv_i18n::Language;
 use netcanv_renderer::paws::Color;
 use netcanv_renderer::{Image as ImageTrait, RenderBackend};
+use serde::de::Visitor;
+use serde::Deserialize;
 use url::Url;
 
 use crate::app::lobby::LobbyColors;
 use crate::app::paint::tool_bar::ToolbarColors;
 use crate::backend::{Backend, Font, Image};
+use crate::config::config;
+use crate::strings::Strings;
 use crate::ui::wm::windows::{WindowButtonColors, WindowButtonsColors};
 use crate::ui::{
    ButtonColors, ColorPickerIcons, ContextMenuColors, ExpandColors, ExpandIcons, RadioButtonColors,
    TextFieldColors,
 };
+use crate::Error;
 
 // WallhackRC
 use crate::whrc_assets_new_icons;
@@ -47,6 +54,7 @@ const PEER_HOST_SVG: &[u8] = include_bytes!("assets/icons/peer-host.svg");
 const SAVE_SVG: &[u8] = include_bytes!("assets/icons/save.svg");
 const DARK_MODE_SVG: &[u8] = include_bytes!("assets/icons/dark-mode.svg");
 const LIGHT_MODE_SVG: &[u8] = include_bytes!("assets/icons/light-mode.svg");
+const TRANSLATE_SVG: &[u8] = include_bytes!("assets/icons/translate.svg");
 const LEGAL_SVG: &[u8] = include_bytes!("assets/icons/legal.svg");
 const WINDOW_CLOSE_SVG: &[u8] = include_bytes!("assets/icons/window-close.svg");
 const WINDOW_PIN_SVG: &[u8] = include_bytes!("assets/icons/window-pin.svg");
@@ -56,29 +64,31 @@ const BANNER_BASE_SVG: &[u8] = include_bytes!("assets/banner/base.svg");
 #[allow(unused)] // This is unused in debug mode, which doesn't render the long shadow.
 const BANNER_SHADOW_PNG: &[u8] = include_bytes!("assets/banner/shadow.png");
 
+const LANGUAGES_FTL: phf::Map<&str, &str> = phf::phf_map! {
+   "en-US" => include_str!("assets/i18n/en-US.ftl"),
+   "pl" => include_str!("assets/i18n/pl.ftl"),
+};
+
 /// Returns whether the licensing information page is available.
 pub fn has_license_page() -> bool {
    ABOUT_HTML.is_some()
 }
 
 /// Opens the licensing information page.
-pub fn open_license_page() -> anyhow::Result<()> {
+pub fn open_license_page() -> netcanv::Result<()> {
    if let Some(about_html) = &ABOUT_HTML {
-      let mut license_file = tempfile::Builder::new()
-         .prefix("netcanv-about")
-         .suffix(".html")
-         .tempfile()
-         .context("could not create temporary file for licensing info")?;
+      let mut license_file =
+         tempfile::Builder::new().prefix("netcanv-about").suffix(".html").tempfile()?;
       license_file.write_all(about_html)?;
-      let (_, path) = license_file.keep()?;
+      let (_, path) = license_file.keep().map_err(|e| Error::FailedToPersistTemporaryFile {
+         error: e.to_string(),
+      })?;
       let url = Url::from_file_path(path)
-         .map_err(|_| anyhow::anyhow!("could not create license page URL"))?;
-      webbrowser::open(url.as_ref()).context("could not open web browser")?;
+         .expect("license page path wasn't absolute and couldn't be turned into a URL");
+      webbrowser::open(url.as_ref()).map_err(|_| Error::CouldNotOpenWebBrowser)?;
       Ok(())
    } else {
-      anyhow::bail!(
-         "NetCanv was built without cargo-about installed. License information is not available"
-      );
+      Err(Error::NoLicensingInformationAvailable)
    }
 }
 
@@ -110,6 +120,7 @@ pub struct PeerIcons {
 pub struct LobbyIcons {
    pub dark_mode: Image,
    pub light_mode: Image,
+   pub translate: Image,
    pub legal: Image,
 }
 
@@ -152,6 +163,10 @@ pub struct Assets {
    pub colors: ColorScheme,
    pub icons: Icons,
    pub banner: Banner,
+
+   pub languages: LanguageCodes,
+   pub language: Language,
+   pub tr: Strings,
 }
 
 impl Assets {
@@ -183,12 +198,46 @@ impl Assets {
       renderer.create_image_from_rgba(image.width(), image.height(), &image)
    }
 
+   /// Loads the mapping from language names to language codes.
+   fn load_languages() -> LanguageCodes {
+      const LANGUAGE_NAMES_TOML: &str = include_str!("assets/i18n/language-names.toml");
+      toml::de::from_str(LANGUAGE_NAMES_TOML).unwrap()
+   }
+
+   /// Loads the language provided in the argument, or if the argument is `None`, the one specified
+   /// in the config.
+   pub fn load_language(language_code: Option<&str>) -> netcanv::Result<Language> {
+      let language_code =
+         language_code.map(|x| x.to_owned()).unwrap_or_else(|| config().language.clone());
+      let language_code = language_code;
+      let language = Language::load(
+         &language_code,
+         LANGUAGES_FTL.get(&language_code).ok_or_else(|| Error::TranslationsDoNotExist {
+            language: language_code.to_owned(),
+         })?,
+      );
+      let language = match language {
+         Ok(language) => language,
+         Err(error) => {
+            log::error!("error while loading language:");
+            log::error!("{}", error);
+            return Err(Error::CouldNotLoadLanguage {
+               language: language_code,
+            });
+         }
+      };
+      Ok(language)
+   }
+
    /// Creates a new instance of Assets with the provided color scheme.
-   pub fn new(renderer: &mut Backend, colors: ColorScheme) -> Self {
-      Self {
+   pub fn new(renderer: &mut Backend, colors: ColorScheme) -> netcanv::Result<Self> {
+      let language = Self::load_language(None)?;
+      let tr = Strings::from_language(&language);
+      Ok(Self {
          sans: renderer.create_font_from_memory(SANS_TTF, 14.0),
          sans_bold: renderer.create_font_from_memory(SANS_BOLD_TTF, 14.0),
          monospace: renderer.create_font_from_memory(MONOSPACE_TTF, 14.0),
+
          colors,
          icons: Icons {
             expand: ExpandIcons {
@@ -201,9 +250,9 @@ impl Assets {
             lobby: LobbyIcons {
                dark_mode: Self::load_svg(renderer, DARK_MODE_SVG),
                light_mode: Self::load_svg(renderer, LIGHT_MODE_SVG),
+               translate: Self::load_svg(renderer, TRANSLATE_SVG),
                legal: Self::load_svg(renderer, LEGAL_SVG),
             },
-
             navigation: NavigationIcons {
                menu: Self::load_svg(renderer, MENU_SVG),
                copy: Self::load_svg(renderer, COPY_SVG),
@@ -227,7 +276,6 @@ impl Assets {
             },
             whrc: whrc_assets_new_icons!(renderer)
          },
-
          banner: Banner {
             base: Self::load_svg(renderer, BANNER_BASE_SVG).colorized(Color::WHITE),
             shadow: {
@@ -243,7 +291,60 @@ impl Assets {
                }
             },
          },
+
+         languages: Self::load_languages(),
+         language,
+         tr,
+      })
+   }
+
+   /// Reloads the language saved in the config file.
+   pub fn reload_language(&mut self) -> netcanv::Result<()> {
+      let language = Self::load_language(None)?;
+      let tr = Strings::from_language(&language);
+      self.language = language;
+      self.tr = tr;
+      Ok(())
+   }
+}
+
+pub struct LanguageCodes(Vec<(String, String)>);
+
+impl<'de> Deserialize<'de> for LanguageCodes {
+   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+   where
+      D: serde::Deserializer<'de>,
+   {
+      struct MapVisitor;
+
+      impl<'de> Visitor<'de> for MapVisitor {
+         type Value = LanguageCodes;
+
+         fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "language code mappings")
+         }
+
+         fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+         where
+            A: serde::de::MapAccess<'de>,
+         {
+            let mut codes = Vec::new();
+            while let Some((key, value)) = map.next_entry()? {
+               codes.push((key, value));
+            }
+            Ok(LanguageCodes(codes))
+         }
       }
+
+      deserializer.deserialize_map(MapVisitor)
+   }
+}
+
+impl Deref for LanguageCodes {
+   type Target = [(String, String)];
+
+   fn deref(&self) -> &Self::Target {
+      &self.0
    }
 }
 

@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use native_dialog::FileDialog;
+use netcanv_i18n::translate_enum::TranslateEnum;
 use netcanv_protocol::relay::RoomId;
 use netcanv_renderer::paws::{vector, AlignH, AlignV, Color, Layout, LineCap, Rect, Renderer};
 use netcanv_renderer::{Font, Image as ImageTrait, RenderBackend};
@@ -13,10 +14,11 @@ use nysa::global as bus;
 use crate::app::{paint, AppState, StateArgs};
 use crate::assets::{self, Assets, ColorScheme};
 use crate::backend::Backend;
-use crate::common::{Error, Fatal};
+use crate::common::{Error, Fatal, StrExt};
 use crate::config::{self, config};
 use crate::net::peer::{self, Peer};
 use crate::net::socket::SocketSystem;
+use crate::strings::Strings;
 use crate::ui::view::View;
 use crate::{ui::*, whrc_app_lobby_host_room};
 
@@ -63,6 +65,7 @@ pub struct State {
 
    main_view: View,
    panel_view: View,
+   language_menu: ContextMenu,
 
    // net
    status: Status,
@@ -83,9 +86,7 @@ impl State {
    pub fn new(assets: Assets) -> Self {
       let nickname_field = TextField::new(Some(&config().lobby.nickname));
       let relay_field = TextField::new(Some(&config().lobby.relay));
-      Self {
-         assets,
-
+      let mut this = Self {
          socket_system: SocketSystem::new(),
 
          nickname_field,
@@ -105,11 +106,17 @@ impl State {
                + 12.0
                + ((WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT - 1.0) as f32 * 2.0),
          )),
+         // The size of the language menu is computed later.
+         language_menu: ContextMenu::new((0.0, 0.0)),
+
+         assets,
 
          status: Status::None,
          peer: None,
          image_file: None,
-      }
+      };
+      this.room_id_field.set_focus(true);
+      this
    }
 
    /// Processes the logo banner.
@@ -177,7 +184,7 @@ impl State {
       ui.push((ui.width(), ui.remaining_height()), Layout::Freeform);
       ui.text(
          &self.assets.sans,
-         "Welcome! Host a room or join an existing one to start painting.",
+         &self.assets.tr.lobby_welcome,
          self.assets.colors.text,
          (AlignH::Left, AlignV::Middle),
       );
@@ -214,9 +221,9 @@ impl State {
          ui,
          input,
          &self.assets.sans,
-         "Nickname",
+         &self.assets.tr.lobby_nickname.label,
          TextFieldArgs {
-            hint: Some("Name shown to others"),
+            hint: Some(&self.assets.tr.lobby_nickname.hint),
             ..textfield
          },
       );
@@ -225,9 +232,9 @@ impl State {
          ui,
          input,
          &self.assets.sans,
-         "Relay server",
+         &self.assets.tr.lobby_relay_server.label,
          TextFieldArgs {
-            hint: Some("IP address"),
+            hint: Some(&self.assets.tr.lobby_relay_server.hint),
             ..textfield
          },
       );
@@ -241,7 +248,7 @@ impl State {
             ui,
             input,
             ExpandArgs {
-               label: "Join an existing room",
+               label: &self.assets.tr.lobby_join_a_room.title,
                ..expand
             },
          )
@@ -253,10 +260,7 @@ impl State {
 
          ui.paragraph(
             &self.assets.sans,
-            &[
-               "Ask your friend for the Room ID",
-               "and enter it into the text field below.",
-            ],
+            self.assets.tr.lobby_join_a_room.description.split('\n'),
             self.assets.colors.text,
             AlignH::Left,
             None,
@@ -270,26 +274,34 @@ impl State {
             ui,
             input,
             &self.assets.sans,
-            "Room ID",
+            &self.assets.tr.lobby_room_id.label,
             TextFieldArgs {
-               hint: Some("6 characters"),
+               hint: Some(&self.assets.tr.lobby_room_id.hint),
                font: &self.assets.monospace,
                ..textfield
             },
          );
          ui.offset(vector(8.0, 16.0));
-         if Button::with_text(ui, input, &button, &self.assets.sans, "Join").clicked()
+         if Button::with_text(
+            ui,
+            input,
+            &button,
+            &self.assets.sans,
+            &self.assets.tr.lobby_join,
+         )
+         .clicked()
             || room_id_field.done()
          {
             match Self::join_room(
                Arc::clone(&self.socket_system),
-               self.nickname_field.text(),
-               self.relay_field.text(),
-               self.room_id_field.text(),
+               &self.assets.tr,
+               self.nickname_field.text().strip_whitespace(),
+               self.relay_field.text().strip_whitespace(),
+               self.room_id_field.text().strip_whitespace(),
             ) {
                Ok(peer) => {
                   self.peer = Some(peer);
-                  self.status = Status::Info("Connecting…".into());
+                  self.status = Status::Info(self.assets.tr.connecting.clone());
                }
                Err(status) => self.status = status,
             }
@@ -308,7 +320,7 @@ impl State {
             ui,
             input,
             ExpandArgs {
-               label: "Host a new room",
+               label: &self.assets.tr.lobby_host_a_new_room.title,
                ..expand
             },
          )
@@ -320,10 +332,7 @@ impl State {
 
          ui.paragraph(
             &self.assets.sans,
-            &[
-               "Create a blank canvas, or load an existing one from file,",
-               "and share the Room ID with your friends.",
-            ],
+            self.assets.tr.lobby_host_a_new_room.description.split('\n'),
             self.assets.colors.text,
             AlignH::Left,
             None,
@@ -332,12 +341,14 @@ impl State {
 
          macro_rules! host_room {
             () => {
-               self.status = Status::Info("Connecting…".into());
+               self.status = Status::Info(self.assets.tr.connecting.clone());
                let whrc_host_args = whrc_app_lobby_macro_host_room!(self);
+
                match Self::host_room(
                   Arc::clone(&self.socket_system),
-                  self.nickname_field.text(),
-                  self.relay_field.text(),
+                  &self.assets.tr,
+                  self.nickname_field.text().strip_whitespace(),
+                  self.relay_field.text().strip_whitespace(),
                   whrc_host_args
                ) {
                   Ok(peer) => self.peer = Some(peer),
@@ -348,15 +359,34 @@ impl State {
 
          ui.push((ui.remaining_width(), 32.0), Layout::Horizontal);
          whrc_app_lobby_process_menu_host_expand_horizontal!(self, ui, input, self.assets);
-         if Button::with_text(ui, input, &button, &self.assets.sans, "Host").clicked() {
+         if Button::with_text(
+            ui,
+            input,
+            &button,
+            &self.assets.sans,
+            &self.assets.tr.lobby_host,
+         )
+         .clicked()
+         {
             host_room!();
          }
          ui.space(8.0);
-         if Button::with_text(ui, input, &button, &self.assets.sans, "from File").clicked() {
+         if Button::with_text(
+            ui,
+            input,
+            &button,
+            &self.assets.sans,
+            &self.assets.tr.lobby_host_from_file,
+         )
+         .clicked()
+         {
             match FileDialog::new()
                .set_filename("canvas.png")
-               .add_filter("Supported image files", &["png", "jpg", "jpeg", "jfif"])
-               .add_filter("NetCanv canvas", &["toml"])
+               .add_filter(
+                  &self.assets.tr.fd_supported_image_files,
+                  &["png", "jpg", "jpeg", "jfif"],
+               )
+               .add_filter(&self.assets.tr.fd_netcanv_canvas, &["toml"])
                .show_open_single_file()
             {
                Ok(Some(path)) => {
@@ -437,8 +467,8 @@ impl State {
          &ButtonArgs::new(ui, &self.assets.colors.action_button).height(32.0).pill().tooltip(
             &self.assets.sans,
             Tooltip::left(match config().ui.color_scheme {
-               config::ColorScheme::Light => "Switch to dark mode",
-               config::ColorScheme::Dark => "Switch to light mode",
+               config::ColorScheme::Light => &self.assets.tr.switch_to_dark_mode,
+               config::ColorScheme::Dark => &self.assets.tr.switch_to_light_mode,
             }),
          ),
          match config().ui.color_scheme {
@@ -460,14 +490,40 @@ impl State {
 
       ui.space(4.0);
 
+      let language_button = Button::with_icon(
+         ui,
+         input,
+         &ButtonArgs::new(ui, &self.assets.colors.action_button)
+            .height(32.0)
+            .pill()
+            .tooltip(&self.assets.sans, Tooltip::left(&self.assets.tr.language)),
+         &self.assets.icons.lobby.translate,
+      );
+      let n_languages = self.assets.languages.len() as f32;
+      let language_menu_rect = TooltipPosition::Left.compute_rect(
+         ui,
+         language_button.group(),
+         vector(128.0, 16.0 + n_languages * 24.0 + (n_languages - 1.0) * 4.0),
+         TooltipLayout {
+            spacing: 24.0,
+            root_padding: 8.0,
+         },
+      );
+      view::layout::absolute(&mut self.language_menu.view, language_menu_rect);
+      if language_button.clicked() {
+         self.language_menu.toggle();
+      }
+
+      ui.space(4.0);
+
       if assets::has_license_page()
          && Button::with_icon(
             ui,
             input,
-            &ButtonArgs::new(ui, &self.assets.colors.action_button)
-               .height(32.0)
-               .pill()
-               .tooltip(&self.assets.sans, Tooltip::left("Open source licenses")),
+            &ButtonArgs::new(ui, &self.assets.colors.action_button).height(32.0).pill().tooltip(
+               &self.assets.sans,
+               Tooltip::left(&self.assets.tr.open_source_licenses),
+            ),
             &self.assets.icons.lobby.legal,
          )
          .clicked()
@@ -478,14 +534,58 @@ impl State {
       whrc_app_lobby_process_icon_panel!(ui, input, self.assets);
    }
 
+   fn process_language_menu(&mut self, ui: &mut Ui, input: &mut Input) {
+      if self
+         .language_menu
+         .begin(
+            ui,
+            input,
+            ContextMenuArgs {
+               colors: &self.assets.colors.context_menu,
+            },
+         )
+         .is_open()
+      {
+         ui.pad(8.0);
+         let mut changed = false;
+         for (name, code) in self.assets.languages.iter() {
+            if Button::with_text_width(
+               ui,
+               input,
+               &ButtonArgs::new(ui, &self.assets.colors.action_button).height(24.0).pill(),
+               if code == &config().language {
+                  &self.assets.sans_bold
+               } else {
+                  &self.assets.sans
+               },
+               name,
+               ui.width(),
+            )
+            .clicked()
+            {
+               config::write(|config| {
+                  config.language = code.clone();
+               });
+               changed = true;
+            }
+            ui.space(4.0);
+         }
+         if changed {
+            catch!(self.assets.reload_language());
+         }
+         self.language_menu.end(ui);
+      }
+   }
+
    /// Checks whether a nickname is valid.
-   fn validate_nickname(nickname: &str) -> Result<(), Status> {
+   fn validate_nickname(tr: &Strings, nickname: &str) -> Result<(), Status> {
+      const MAX_LEN: usize = 16;
       if nickname.is_empty() {
-         return Err(Status::Error("Nickname must not be empty".into()));
+         return Err(Status::Error(tr.error_nickname_must_not_be_empty.clone()));
       }
       if nickname.len() > 16 {
          return Err(Status::Error(
-            "The maximum length of a nickname is 16 characters".into(),
+            tr.error_nickname_too_long.format().with("max-length", MAX_LEN).done(),
          ));
       }
       Ok(())
@@ -494,27 +594,29 @@ impl State {
    /// Establishes a connection to the relay and hosts a new room.
    fn host_room(
       socket_system: Arc<SocketSystem>,
+      tr: &Strings,
       nickname: &str,
       relay_addr_str: &str,
       whrc_host_args: WHRCAppLobbyHostRoomArgs
    ) -> Result<Peer, Status> {
-      Self::validate_nickname(nickname)?;
+      Self::validate_nickname(tr, nickname)?;
       whrc_app_lobby_host_room!(self, socket_system, nickname, relay_addr_str, whrc_host_args)
    }
 
    /// Establishes a connection to the relay and joins an existing room.
    fn join_room(
       socket_system: Arc<SocketSystem>,
+      tr: &Strings,
       nickname: &str,
       relay_addr_str: &str,
       room_id_str: &str,
    ) -> Result<Peer, Status> {
-      if room_id_str.len() != 6 {
+      if room_id_str.len() != RoomId::LEN {
          return Err(Status::Error(
-            "Room ID must be a code with 6 characters".into(),
+            tr.error_invalid_room_id_length.format().with("length", RoomId::LEN).done(),
          ));
       }
-      Self::validate_nickname(nickname)?;
+      Self::validate_nickname(tr, nickname)?;
       let room_id = RoomId::try_from(room_id_str)?;
       Ok(Peer::join(socket_system, nickname, relay_addr_str, room_id))
    }
@@ -522,8 +624,8 @@ impl State {
    /// Saves the user configuration.
    fn save_config(&mut self) {
       config::write(|config| {
-         config.lobby.nickname = self.nickname_field.text().to_owned();
-         config.lobby.relay = self.relay_field.text().to_owned();
+         config.lobby.nickname = self.nickname_field.text().strip_whitespace().to_owned();
+         config.lobby.relay = self.relay_field.text().strip_whitespace().to_owned();
       });
    }
 }
@@ -591,15 +693,27 @@ impl AppState for State {
       self.process_icon_panel(ui, input);
       self.panel_view.end(ui);
 
+      // Language menu
+
+      self.process_language_menu(ui, input);
+
       for message in &bus::retrieve_all::<Error>() {
          let error = message.consume().0;
-         log::error!("{}", error);
-         self.status = Status::Error(error.to_string());
+         log::error!("error: {:?}", error);
+         self.status = Status::Error(error.translate(&self.assets.language));
       }
       for message in &bus::retrieve_all::<Fatal>() {
          let fatal = message.consume().0;
-         log::error!("fatal: {}", fatal);
-         self.status = Status::Error(format!("Fatal: {}", fatal));
+         log::error!("fatal: {:?}", fatal);
+         self.status = Status::Error(
+            self
+               .assets
+               .tr
+               .error_fatal
+               .format()
+               .with("error", fatal.translate(&self.assets.language))
+               .done(),
+         );
       }
    }
 

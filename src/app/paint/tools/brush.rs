@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use crate::backend::winit::event::MouseButton;
 use crate::config::config;
 use crate::keymap::KeyBinding;
+use crate::Error;
 use netcanv_protocol::relay::PeerId;
 use netcanv_renderer::paws::{
    point, vector, AlignH, AlignV, Color, Layout, LineCap, Point, Rect, Renderer,
@@ -16,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::app::paint::{self, GlobalControls};
 use crate::assets::Assets;
 use crate::backend::{Backend, Image};
-use crate::common::{lerp_point, ColorMath};
+use crate::common::{deserialize_bincode, lerp_point, ColorMath};
 use crate::paint_canvas::PaintCanvas;
 use crate::ui::{
    view, ButtonState, ColorPicker, ColorPickerArgs, Modifier, MouseScroll, Slider, SliderArgs,
@@ -123,7 +124,7 @@ impl BrushTool {
 
 impl Tool for BrushTool {
    fn name(&self) -> &'static str {
-      "Brush"
+      "brush"
    }
 
    fn icon(&self) -> &Image {
@@ -318,7 +319,12 @@ impl Tool for BrushTool {
       ui.space(16.0);
 
       // Draw the thickness: its slider and value display.
-      ui.horizontal_label(&assets.sans, "Thickness", assets.colors.text, None);
+      ui.horizontal_label(
+         &assets.sans,
+         &assets.tr.brush_thickness,
+         assets.colors.text,
+         None,
+      );
       ui.space(16.0);
 
       ui.push((192.0, ui.height()), Layout::Freeform);
@@ -360,7 +366,7 @@ impl Tool for BrushTool {
       );
    }
 
-   fn network_send(&mut self, net: Net, global_controls: &GlobalControls) -> anyhow::Result<()> {
+   fn network_send(&mut self, net: Net, global_controls: &GlobalControls) -> netcanv::Result<()> {
       if !self.stroke_points.is_empty() {
          let packet = Packet::Stroke(self.stroke_points.drain(..).collect());
          net.send(self, PeerId::BROADCAST, packet)?;
@@ -388,8 +394,8 @@ impl Tool for BrushTool {
       paint_canvas: &mut PaintCanvas,
       sender: PeerId,
       payload: Vec<u8>,
-   ) -> anyhow::Result<()> {
-      let packet: Packet = bincode::deserialize(&payload)?;
+   ) -> netcanv::Result<()> {
+      let packet: Packet = deserialize_bincode(&payload)?;
       match packet {
          Packet::Cursor {
             position: (x, y),
@@ -415,7 +421,10 @@ impl Tool for BrushTool {
                let thickness = thickness as f32;
                // With thickness being a float, we allow for a little bit of leeway because
                // computers are dumb.
-               anyhow::ensure!(thickness <= Self::MAX_THICKNESS + 0.1);
+               ensure!(
+                  thickness <= Self::MAX_THICKNESS + 0.1,
+                  Error::InvalidToolPacket
+               );
                // Draw the stroke.
                let a = {
                   let (ax, ay) = a;
@@ -436,7 +445,7 @@ impl Tool for BrushTool {
       Ok(())
    }
 
-   fn network_peer_activate(&mut self, _net: Net, peer_id: PeerId) -> anyhow::Result<()> {
+   fn network_peer_activate(&mut self, _net: Net, peer_id: PeerId) -> netcanv::Result<()> {
       self.ensure_peer(peer_id);
       Ok(())
    }

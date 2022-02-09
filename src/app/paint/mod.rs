@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use netcanv_i18n::translate_enum::TranslateEnum;
 use netcanv_protocol::relay::PeerId;
 use netcanv_renderer::paws::{
    point, vector, AlignH, AlignV, Color, Layout, Rect, Renderer, Vector,
@@ -147,7 +148,7 @@ impl State {
       peer: Peer,
       image_path: Option<PathBuf>,
       renderer: &mut Backend,
-   ) -> Result<Self, (anyhow::Error, Assets)> {
+   ) -> Result<Self, (netcanv::Error, Assets)> {
       let runtime = tokio::runtime::Builder::new_multi_thread()
          .max_blocking_threads(16)
          .enable_all()
@@ -205,11 +206,10 @@ impl State {
       }
 
       if this.peer.is_host() {
-         log!(this.log, "Welcome to your room!");
-         log!(
-            this.log,
-            "To invite friends, send them the room ID shown in the bottom right corner of your screen."
-         );
+         for line in this.assets.tr.paint_welcome_host.split('\n') {
+            log!(this.log, "{}", line);
+         }
+         this.overflow_menu.open();
       }
 
       Ok(this)
@@ -385,6 +385,11 @@ impl State {
       }
 
       // Drawing & key shortcuts
+
+      self.toolbar.with_each_tool::<(), _>(|_, tool| {
+         tool.process_background_jobs(tool_args!(ui, input, self), &mut self.paint_canvas);
+         ControlFlow::Continue
+      });
 
       self.process_tool_key_shortcuts(ui, input);
 
@@ -580,7 +585,7 @@ impl State {
 
          ui.vertical_label(
             &self.assets.sans,
-            "Room ID",
+            &self.assets.tr.room_id,
             self.assets.colors.text,
             AlignH::Left,
          );
@@ -596,7 +601,7 @@ impl State {
          )
          .clicked()
          {
-            log!(self.log, "Room ID copied to clipboard");
+            log!(self.log, "{}", &self.assets.tr.room_id_copied);
             catch!(clipboard::copy_string(id_text.clone()));
          }
          ui.horizontal_label(
@@ -627,7 +632,7 @@ impl State {
          if self.peer.is_host() {
             ui.horizontal_label(
                &self.assets.sans,
-               "You are the host",
+               &self.assets.tr.you_are_the_host,
                self.assets.colors.text,
                None,
             );
@@ -640,7 +645,7 @@ impl State {
             let name = truncate_text(
                &self.assets.sans_bold,
                ui.width(),
-               self.peer.host_name().unwrap_or("<unknown>"),
+               self.peer.host_name().unwrap_or(&self.assets.tr.unknown_host),
             );
             ui.vertical_label(
                &self.assets.sans_bold,
@@ -651,7 +656,7 @@ impl State {
             ui.space(4.0);
             ui.vertical_label(
                &self.assets.sans,
-               "is your host",
+               &self.assets.tr.someone_is_your_host,
                self.assets.colors.text,
                AlignH::Left,
             );
@@ -683,7 +688,7 @@ impl State {
                   ui.space(4.0);
                   ui.horizontal_label(
                      &self.assets.sans,
-                     action.name(),
+                     &self.assets.tr.action.get(action.name()),
                      self.assets.colors.text,
                      None,
                   );
@@ -692,9 +697,20 @@ impl State {
             );
             if action_button.clicked() {
                if let Err(error) = action.perform(ActionArgs {
+                  assets: &self.assets,
                   paint_canvas: &mut self.paint_canvas,
                }) {
-                  log!(self.log, "error while performing action: {}", error);
+                  log!(
+                     self.log,
+                     "{}",
+                     self
+                        .assets
+                        .tr
+                        .error_while_performing_action
+                        .format()
+                        .with("error", error.translate(&self.assets.language))
+                        .done()
+                  );
                }
             }
             ui.space(4.0);
@@ -704,12 +720,22 @@ impl State {
       }
    }
 
-   fn process_peer_message(&mut self, ui: &mut Ui, message: peer::Message) -> anyhow::Result<()> {
+   fn process_peer_message(&mut self, ui: &mut Ui, message: peer::Message) -> netcanv::Result<()> {
       use peer::MessageKind;
 
       match message.kind {
          MessageKind::Joined(nickname, peer_id) => {
-            log!(self.log, "{} joined the room", nickname);
+            log!(
+               self.log,
+               "{}",
+               self
+                  .assets
+                  .tr
+                  .someone_joined_the_room
+                  .format()
+                  .with("nickname", nickname.as_str())
+                  .done()
+            );
             if self.peer.is_host() {
                let positions = self.paint_canvas.chunk_positions();
                self.peer.send_chunk_positions(peer_id, positions)?;
@@ -728,7 +754,17 @@ impl State {
             nickname,
             last_tool,
          } => {
-            log!(self.log, "{} has left", nickname);
+            log!(
+               self.log,
+               "{}",
+               self
+                  .assets
+                  .tr
+                  .someone_left_the_room
+                  .format()
+                  .with("nickname", nickname.as_str())
+                  .done()
+            );
             // Make sure the tool they were last using is properly deinitialized.
             if let Some(tool) = last_tool {
                if let Some(tool_id) = self.toolbar.tool_by_name(&tool) {
@@ -743,9 +779,19 @@ impl State {
                }
             }
          }
-         MessageKind::NewHost(name) => log!(self.log, "{} is now hosting the room", name),
+         MessageKind::NewHost(nickname) => log!(
+            self.log,
+            "{}",
+            self
+               .assets
+               .tr
+               .someone_is_now_hosting_the_room
+               .format()
+               .with("nickname", nickname.as_str())
+               .done()
+         ),
          MessageKind::NowHosting => {
-            log!(self.log, "You are now hosting the room");
+            log!(self.log, "{}", self.assets.tr.you_are_now_hosting_the_room);
             self.chunk_downloads.clear();
          }
          MessageKind::ChunkPositions(positions) => {
@@ -862,10 +908,21 @@ impl AppState for State {
 
       for action in &mut self.actions {
          match action.process(ActionArgs {
+            assets: &self.assets,
             paint_canvas: &mut self.paint_canvas,
          }) {
             Ok(()) => (),
-            Err(error) => log!(self.log, "error while processing action: {}", error),
+            Err(error) => log!(
+               self.log,
+               "{}",
+               self
+                  .assets
+                  .tr
+                  .error_while_processing_action
+                  .format()
+                  .with("error", error.translate(&self.assets.language))
+                  .done()
+            ),
          }
       }
 
@@ -893,7 +950,17 @@ impl AppState for State {
 
       for message in &bus::retrieve_all::<Error>() {
          let Error(error) = message.consume();
-         log!(self.log, "error: {}", error);
+         log!(
+            self.log,
+            "{}",
+            self
+               .assets
+               .tr
+               .error
+               .format()
+               .with("error", error.translate(&self.assets.language).as_ref())
+               .done()
+         );
       }
       for _ in &bus::retrieve_all::<Fatal>() {
          self.fatal_error = true;

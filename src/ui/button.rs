@@ -1,6 +1,6 @@
 //! Pressable buttons.
 
-use netcanv_renderer::paws::{AlignH, AlignV, Color, Layout};
+use netcanv_renderer::paws::{AlignH, AlignV, Color, Layout, Rect};
 use netcanv_renderer::Font as FontTrait;
 
 use crate::backend::{Font, Image};
@@ -34,16 +34,16 @@ impl ButtonColors {
 
 /// The layout and color scheme arguments for processing the button.
 #[derive(Clone)]
-pub struct ButtonArgs<'c, 'f> {
+pub struct ButtonArgs<'a> {
    height: f32,
-   colors: &'c ButtonColors,
+   colors: &'a ButtonColors,
    corner_radius: f32,
-   tooltip: Option<(&'f Font, Tooltip)>,
+   tooltip: Option<(&'a Font, Tooltip<'a>)>,
 }
 
-impl<'c, 'f> ButtonArgs<'c, 'f> {
+impl<'a> ButtonArgs<'a> {
    /// Creates a new button style with the given color scheme.
-   pub fn new(ui: &Ui, colors: &'c ButtonColors) -> Self {
+   pub fn new(ui: &Ui, colors: &'a ButtonColors) -> Self {
       Self {
          height: ui.height(),
          colors,
@@ -65,7 +65,7 @@ impl<'c, 'f> ButtonArgs<'c, 'f> {
    }
 
    /// Sets the button's tooltip.
-   pub fn tooltip(mut self, font: &'f Font, tooltip: Tooltip) -> Self {
+   pub fn tooltip(mut self, font: &'a Font, tooltip: Tooltip<'a>) -> Self {
       self.tooltip = Some((font, tooltip));
       self
    }
@@ -80,6 +80,7 @@ impl<'c, 'f> ButtonArgs<'c, 'f> {
 /// The result of button interaction computed after processing it.
 pub struct ButtonProcessResult {
    clicked: bool,
+   group: Rect,
 }
 
 impl Button {
@@ -121,9 +122,28 @@ impl Button {
       }
       let clicked = ui.clicked(input, MouseButton::Left);
 
+      let group = ui.rect();
+
       ui.pop();
 
-      ButtonProcessResult { clicked }
+      ButtonProcessResult { clicked, group }
+   }
+
+   /// Processes a button with text rendered on top, and an explicit pixel width.
+   pub fn with_text_width(
+      ui: &mut Ui,
+      input: &Input,
+      args: &ButtonArgs,
+      font: &Font,
+      text: &str,
+      width: f32,
+   ) -> ButtonProcessResult {
+      let color = args.colors.text;
+      Self::process(ui, input, args, Some(width), |ui| {
+         ui.push((width, ui.height()), Layout::Freeform);
+         ui.text(font, text, color, (AlignH::Center, AlignV::Middle));
+         ui.pop();
+      })
    }
 
    /// Processes a button with text rendered on top.
@@ -135,12 +155,7 @@ impl Button {
       text: &str,
    ) -> ButtonProcessResult {
       let width = font.text_width(text) + args.height;
-      let color = args.colors.text;
-      Self::process(ui, input, args, Some(width), |ui| {
-         ui.push((width, ui.height()), Layout::Freeform);
-         ui.text(font, text, color, (AlignH::Center, AlignV::Middle));
-         ui.pop();
-      })
+      Self::with_text_width(ui, input, args, font, text, width)
    }
 
    /// Processes a button with a square icon rendered on top.
@@ -159,6 +174,13 @@ impl Button {
 }
 
 impl ButtonProcessResult {
+   /// Returns the group rectangle of the button. Can be used to position things next to the button
+   /// using `TooltipPositions`.
+   pub fn group(&self) -> Rect {
+      self.group
+   }
+
+   /// Returns whether the button was clicked on this frame.
    pub fn clicked(self) -> bool {
       self.clicked
    }
