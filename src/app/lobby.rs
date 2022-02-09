@@ -577,6 +577,49 @@ impl State {
       }
    }
 
+   fn process_language_menu(&mut self, ui: &mut Ui, input: &mut Input) {
+      if self
+         .language_menu
+         .begin(
+            ui,
+            input,
+            ContextMenuArgs {
+               colors: &self.assets.colors.context_menu,
+            },
+         )
+         .is_open()
+      {
+         ui.pad(8.0);
+         let mut changed = false;
+         for (name, code) in self.assets.languages.iter() {
+            if Button::with_text_width(
+               ui,
+               input,
+               &ButtonArgs::new(ui, &self.assets.colors.action_button).height(24.0).pill(),
+               if code == &config().language {
+                  &self.assets.sans_bold
+               } else {
+                  &self.assets.sans
+               },
+               name,
+               ui.width(),
+            )
+            .clicked()
+            {
+               config::write(|config| {
+                  config.language = code.clone();
+               });
+               changed = true;
+            }
+            ui.space(4.0);
+         }
+         if changed {
+            catch!(self.assets.reload_language());
+         }
+         self.language_menu.end(ui);
+      }
+   }
+
    /// Checks whether a nickname is valid.
    fn validate_nickname(tr: &Strings, nickname: &str) -> Result<(), Status> {
       const MAX_LEN: usize = 16;
