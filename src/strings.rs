@@ -76,6 +76,9 @@ pub struct Strings {
    pub error_invalid_room_id_length: Formatted,
    pub error_while_performing_action: Formatted,
    pub error_while_processing_action: Formatted,
+
+   // WallhackRC
+   pub whrc: Map<String>
 }
 
 #[derive(FromLanguage)]

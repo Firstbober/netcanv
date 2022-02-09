@@ -20,12 +20,15 @@ use crate::net::peer::{self, Peer};
 use crate::net::socket::SocketSystem;
 use crate::strings::Strings;
 use crate::ui::view::View;
-use crate::{ui::*, whrc_app_lobby_host_room};
+use crate::ui::*;
+use crate::whrc_app_lobby_host_room;
 
-use crate::whrc::{WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT, WHRCAppLobbyHostRoomArgs, WHRCPeerFuncs};
+use crate::whrc::{
+   WHRCAppLobbyHostRoomArgs, WHRCPeerFuncs, WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT,
+};
 use crate::{
-   whrc_app_lobby_process_icon_panel, whrc_app_lobby_process_menu_host_expand_horizontal,
-   whrc_app_lobby_macro_host_room
+   whrc_app_lobby_macro_host_room, whrc_app_lobby_process_icon_panel,
+   whrc_app_lobby_process_menu_host_expand_horizontal,
 };
 
 /// Colors used in the lobby screen.
@@ -102,9 +105,7 @@ impl State {
          )),
          panel_view: View::new((
             40.0,
-            (WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT * 32.0)
-               + 12.0
-               + ((WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT - 1.0) as f32 * 2.0),
+            4.0 + (3.0 + WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT) * 36.0,
          )),
          // The size of the language menu is computed later.
          language_menu: ContextMenu::new((0.0, 0.0)),
@@ -349,7 +350,7 @@ impl State {
                   &self.assets.tr,
                   self.nickname_field.text().strip_whitespace(),
                   self.relay_field.text().strip_whitespace(),
-                  whrc_host_args
+                  whrc_host_args,
                ) {
                   Ok(peer) => self.peer = Some(peer),
                   Err(status) => self.status = status,
@@ -577,49 +578,6 @@ impl State {
       }
    }
 
-   fn process_language_menu(&mut self, ui: &mut Ui, input: &mut Input) {
-      if self
-         .language_menu
-         .begin(
-            ui,
-            input,
-            ContextMenuArgs {
-               colors: &self.assets.colors.context_menu,
-            },
-         )
-         .is_open()
-      {
-         ui.pad(8.0);
-         let mut changed = false;
-         for (name, code) in self.assets.languages.iter() {
-            if Button::with_text_width(
-               ui,
-               input,
-               &ButtonArgs::new(ui, &self.assets.colors.action_button).height(24.0).pill(),
-               if code == &config().language {
-                  &self.assets.sans_bold
-               } else {
-                  &self.assets.sans
-               },
-               name,
-               ui.width(),
-            )
-            .clicked()
-            {
-               config::write(|config| {
-                  config.language = code.clone();
-               });
-               changed = true;
-            }
-            ui.space(4.0);
-         }
-         if changed {
-            catch!(self.assets.reload_language());
-         }
-         self.language_menu.end(ui);
-      }
-   }
-
    /// Checks whether a nickname is valid.
    fn validate_nickname(tr: &Strings, nickname: &str) -> Result<(), Status> {
       const MAX_LEN: usize = 16;
@@ -640,10 +598,16 @@ impl State {
       tr: &Strings,
       nickname: &str,
       relay_addr_str: &str,
-      whrc_host_args: WHRCAppLobbyHostRoomArgs
+      whrc_host_args: WHRCAppLobbyHostRoomArgs,
    ) -> Result<Peer, Status> {
       Self::validate_nickname(tr, nickname)?;
-      whrc_app_lobby_host_room!(self, socket_system, nickname, relay_addr_str, whrc_host_args)
+      whrc_app_lobby_host_room!(
+         self,
+         socket_system,
+         nickname,
+         relay_addr_str,
+         whrc_host_args
+      )
    }
 
    /// Establishes a connection to the relay and joins an existing room.

@@ -57,6 +57,7 @@ you-are-now-hosting-the-room = You are now hosting the room
 tool-selection = Selection
 tool-brush = Brush
 tool-eyedropper = Eyedropper
+tool-whrc-paste-large-images = [WHRC] Paste Large Images
 
 brush-thickness = Thickness
 
@@ -170,3 +171,7 @@ error-nickname-too-long = The maximum length of a nickname is { $max-length } ch
 error-invalid-room-id-length = { room-id } must be a code with { $length } characters
 error-while-performing-action = Error while performing action: { $error }
 error-while-processing-action = Error while processing action: { $error }
+
+## WHRC
+
+whrc-select-image-to-paste = Select image to paste

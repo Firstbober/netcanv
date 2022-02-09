@@ -39,7 +39,7 @@ impl WHRCToolPasteLargeImages {
 
 impl Tool for WHRCToolPasteLargeImages {
    fn name(&self) -> &'static str {
-      "[WHRC] Paste Large Images"
+      "whrc-paste-large-images"
    }
 
    fn icon(&self) -> &Image {
@@ -55,7 +55,7 @@ impl Tool for WHRCToolPasteLargeImages {
          args.ui,
          args.input,
          &ButtonArgs::new(args.ui, &args.assets.colors.toolbar_button)
-            .tooltip(&args.assets.sans, Tooltip::top("Select image to paste")),
+            .tooltip(&args.assets.sans, Tooltip::top(&args.assets.tr.whrc.get("select-image-to-paste"))),
          &self.icon_attach_file,
       )
       .clicked()

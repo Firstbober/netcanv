@@ -51,8 +51,8 @@ macro_rules! whrc_assets_new_icons {
 // ------------------
 // app/lobby.rs hooks
 
-// const = NetCanv default button count + custom button count
-pub const WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT: f32 = 2.0 + 1.0;
+// const = custom button count
+pub const WHRC_APP_LOBBY_ICON_PANEL_BUTTON_COUNT: f32 = 1.0;
 
 #[macro_export]
 macro_rules! whrc_app_lobby_process_icon_panel {
@@ -178,8 +178,6 @@ macro_rules! whrc_app_lobby_host_room {
 #[macro_export]
 macro_rules! whrc_net_peer_connected_to_relay {
    ($self: expr) => {
-      println!("eeeeeee");
-
       $self.send_to_relay(if $self.is_host && $self.room_id.is_some() {
          relay::Packet::WHRCHostCustomId($self.room_id.unwrap())
       } else if $self.is_host {

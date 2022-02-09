@@ -61,6 +61,7 @@ you-are-now-hosting-the-room = Zostałeś gospodarzem pokoju
 tool-selection = Zaznaczenie
 tool-brush = Pędzel
 tool-eyedropper = Pipeta
+tool-whrc-paste-large-images = [WHRC] Wklej Duże Obrazki
 
 brush-thickness = Grubość
 
@@ -162,3 +163,7 @@ error-nickname-too-long = Maksymalna długość nazwy to { $max-length } znaków
 error-invalid-room-id-length = { room-id } musi być kodem o { $length } znakach
 error-while-performing-action = Błąd podczas wykonywania akcji: { $error }
 error-while-processing-action = Błąd podczas przetwarzania akcji: { $error }
+
+## WHRC
+
+whrc-select-image-to-paste = Wybierz obrazek do wklejenia
