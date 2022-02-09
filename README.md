@@ -1,6 +1,6 @@
 # WallhackRC
 
-WallhackD reborn for newer NetCanv versions. Currently targeting 0.7.0.
+WallhackD reborn for newer NetCanv versions. Currently targeting 0.8.0.
 
 Features are slowy ported from WHD. Stay tuned.
 
