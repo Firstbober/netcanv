@@ -17,10 +17,13 @@ members = [
    "netcanv-renderer-wgpu",
    "netcanv-relay",
    "netcanv-protocol",
+
+   # WallhackD
+   "whd-common"
 ]
 
 [features]
-default = ["renderer-opengl"]
+default = ["renderer-wgpu"]
 renderer-opengl = ["netcanv-renderer-opengl"]
 renderer-wgpu = ["netcanv-renderer-wgpu"]
 
@@ -92,6 +95,8 @@ netcanv-renderer-wgpu = { path = "netcanv-renderer-wgpu", optional = true }
 netcanv-protocol = { path = "netcanv-protocol", features = ["i18n"] }
 
 netcanv-i18n = { path = "netcanv-i18n" }
+
+whd-common = { path = "whd-common" }
 
 [workspace.dependencies]
 clap = { version = "4.5.7", features = ["derive"] }

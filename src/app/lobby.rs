@@ -7,9 +7,10 @@ use std::sync::Arc;
 use native_dialog::FileDialog;
 use netcanv_i18n::translate_enum::TranslateEnum;
 use netcanv_protocol::relay::RoomId;
-use netcanv_renderer::paws::{vector, AlignH, AlignV, Color, Layout, LineCap, Rect, Renderer};
+use netcanv_renderer::paws::{vector, AlignH, AlignV, Color, Layout, LineCap, Padding, Rect, Renderer};
 use netcanv_renderer::{Font, Image as ImageTrait, RenderBackend};
 use nysa::global as bus;
+use whd_common::{WALLHACKD_SLOGAN, WALLHACKD_VERSION, WALLHACKD_YEAR};
 
 use crate::app::{paint, AppState, StateArgs};
 use crate::assets::{self, Assets, ColorScheme};
@@ -74,7 +75,7 @@ impl State {
 
    const VIEW_BOX_PADDING: f32 = 16.0;
    const VIEW_BOX_WIDTH: f32 = 388.0 + Self::VIEW_BOX_PADDING * 2.0;
-   const VIEW_BOX_HEIGHT: f32 = Self::MENU_HEIGHT + Self::VIEW_BOX_PADDING * 2.0;
+   const VIEW_BOX_HEIGHT: f32 = Self::MENU_HEIGHT + Self::VIEW_BOX_PADDING * 2.0 + 32.0;
 
    /// Creates and initializes the lobby state.
    pub fn new(assets: Box<Assets>, socket_system: Arc<SocketSystem>) -> Self {
@@ -179,7 +180,19 @@ impl State {
       );
       ui.pop();
 
+      ui.space(16.0);
+
+      ui.push((ui.width(), ui.remaining_height()), Layout::Freeform);
+      ui.text(
+         &self.assets.sans,
+         &format!("WallhackD {} {} = {}", WALLHACKD_VERSION, WALLHACKD_YEAR, WALLHACKD_SLOGAN),
+         self.assets.colors.text,
+         (AlignH::Left, AlignV::Middle),
+      );
       ui.pop();
+
+      ui.pop();
+      ui.space(16.0);
    }
 
    /// Processes the connection menu (nickname and relay fields and two Expands with options

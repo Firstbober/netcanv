@@ -14,6 +14,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::Assets;
+use crate::cli::Cli;
 use crate::keymap::Keymap;
 use crate::Error;
 
@@ -138,8 +139,8 @@ impl Default for UserConfig {
       Self {
          language: default_language(),
          lobby: LobbyConfig {
-            nickname: "Anon".to_owned(),
-            relay: option_env!("NETCANV_DEFAULT_RELAY_URL").unwrap_or("ws://localhost").to_owned(),
+            nickname: "AnonD".to_owned(),
+            relay: option_env!("NETCANV_DEFAULT_RELAY_URL").unwrap_or("ws://ncanarchy.firstbober.com").to_owned(),
          },
          ui: UiConfig {
             color_scheme: ColorScheme::Light,
@@ -178,6 +179,7 @@ fn default_language() -> String {
 }
 
 static CONFIG: OnceCell<RwLock<UserConfig>> = OnceCell::new();
+static CLI_CONFIG: OnceCell<RwLock<Cli>> = OnceCell::new();
 
 /// Loads or creates the user config.
 pub fn load_or_create() -> netcanv::Result<()> {
@@ -187,6 +189,9 @@ pub fn load_or_create() -> netcanv::Result<()> {
    if CONFIG.set(RwLock::new(config)).is_err() {
       return Err(Error::ConfigIsAlreadyLoaded);
    }
+   // if CLI_CONFIG.set(RwLock::new(cli)).is_err() {
+   //    return Err(Error::ConfigIsAlreadyLoaded);
+   // }
    Ok(())
 }
 
@@ -200,6 +205,12 @@ pub fn save() -> netcanv::Result<()> {
 pub fn config() -> RwLockReadGuard<'static, UserConfig> {
    CONFIG.get().expect("attempt to read config without loading it").read().unwrap()
 }
+
+/// Reads from the user config.
+pub fn cli_config() -> RwLockReadGuard<'static, Cli> {
+   CLI_CONFIG.get().expect("attempt to read cli config without loading it").read().unwrap()
+}
+
 
 /// Writes to the user config. After the closure is done running, saves the user config to the disk.
 pub fn write(f: impl FnOnce(&mut UserConfig)) {

@@ -7,6 +7,7 @@ mod tools;
 use image::RgbaImage;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::process::exit;
 use std::sync::Arc;
 use web_time::{Duration, Instant};
 
@@ -92,6 +93,7 @@ pub struct State {
    assets: Box<Assets>,
    socket_system: Arc<SocketSystem>,
    project_file: ProjectFile,
+   save_path: Option<PathBuf>,
 
    paint_canvas: PaintCanvas,
    cache_layer: CacheLayer,
@@ -167,6 +169,8 @@ impl State {
          assets,
          socket_system,
 
+         save_path: image_path.clone(),
+
          paint_canvas: PaintCanvas::new(),
          cache_layer: CacheLayer::new(),
          project_file: ProjectFile::new(),
@@ -212,8 +216,11 @@ impl State {
       this.register_actions(renderer);
 
       if let Some(path) = image_path {
-         if let Err(error) = this.project_file.load(renderer, &path, &mut this.paint_canvas) {
-            return Err((error, this.assets));
+         if !this.peer.is_host() {
+         } else {
+            if let Err(error) = this.project_file.load(renderer, &path, &mut this.paint_canvas) {
+               return Err((error, this.assets));
+            }
          }
       }
 

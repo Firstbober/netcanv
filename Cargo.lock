@@ -1867,6 +1867,7 @@ dependencies = [
  "usvg",
  "web-time",
  "webbrowser",
+ "whd-common",
 ]
 
 [[package]]
@@ -4241,6 +4242,10 @@ dependencies = [
  "js-sys",
  "web-sys",
 ]
+
+[[package]]
+name = "whd-common"
+version = "1.2.0"
 
 [[package]]
 name = "which"

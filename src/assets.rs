@@ -5,7 +5,7 @@ use std::ops::Deref;
 
 use netcanv_i18n::from_language::FromLanguage;
 use netcanv_i18n::Language;
-use netcanv_renderer::paws::Color;
+use netcanv_renderer::paws::{rgb, rgba, Color};
 use netcanv_renderer::{Image as ImageTrait, RenderBackend};
 use serde::de::Visitor;
 use serde::Deserialize;
@@ -394,6 +394,28 @@ impl CommonColors {
          white: Color::WHITE,
       }
    }
+
+   fn wallhackd() -> Self {
+      let accent = Color::argb(0xFF9FA8DA);
+
+      Self {
+         gray_00: blend_colors(Color::rgb(0xb7b7b7), accent, 0.2),
+         gray_20: blend_colors(Color::rgb(0xa0a0a0), accent, 0.2),
+         gray_50: blend_colors(Color::rgb(0x6f6f6f), accent, 0.2),
+         gray_60: blend_colors(Color::rgb(0x343434), accent, 0.2),
+         gray_80: blend_colors(Color::rgb(0x1f1f1f), accent, 0.2),
+         gray_90: blend_colors(Color::rgb(0x383838), accent, 0.2),
+
+         red_10: blend_colors(Color::rgb(0xdb325a), accent, 0.2),
+         red_30: blend_colors(Color::rgb(0xff7593), accent, 0.2),
+
+         blue_30: blend_colors(Color::rgb(0x007ccf), accent, 0.2),
+         blue_50: blend_colors(Color::rgb(0x0397fb), accent, 0.8),
+         blue_70: blend_colors(Color::rgb(0x32aafa), accent, 0.2),
+
+         white: blend_colors(Color::WHITE, accent, 0.0),
+      }
+   }
 }
 
 /// A color scheme.
@@ -420,6 +442,36 @@ pub struct ColorScheme {
    pub lobby: LobbyColors,
 }
 
+
+fn darken_color(color: Color, amount: f32) -> Color {
+   rgb(
+       (color.r as f32 * amount).round() as u8,
+       (color.g as f32 * amount).round() as u8,
+       (color.b as f32 * amount).round() as u8,
+   )
+}
+
+fn lighten_color(color: Color, amount: f32) -> Color {
+   rgb(
+       color.r + ((255 - color.r) as f32 * amount).round() as u8,
+       color.g + ((255 - color.g) as f32 * amount).round() as u8,
+       color.b + ((255 - color.b) as f32 * amount).round() as u8,
+   )
+}
+
+fn lerp(v0: f32, v1: f32, t: f32) -> f32 {
+   v0 + t * (v1 - v0)
+}
+
+fn blend_colors(c1: Color, c2: Color, t: f32) -> Color {
+   rgba(
+      (lerp(c1.r as f32 / 255.0, c2.r as f32 / 255.0, t) * 255.0).round() as u8,
+      (lerp(c1.g as f32 / 255.0, c2.g as f32 / 255.0, t) * 255.0).round() as u8,
+      (lerp(c1.b as f32 / 255.0, c2.b as f32 / 255.0, t) * 255.0).round() as u8,
+      (lerp(c1.a as f32 / 255.0, c2.a as f32 / 255.0, t) * 255.0).round() as u8,
+   )
+}
+
 impl ColorScheme {
    /// Constructs and returns the light color scheme.
    pub fn light() -> Self {
@@ -429,6 +481,121 @@ impl ColorScheme {
    /// Constructs and returns the dark color scheme.
    pub fn dark() -> Self {
       Self::from(CommonColors::dark())
+   }
+
+   pub fn wallhackd() -> Self {
+      let colors = CommonColors::wallhackd();
+      let black_hover = colors.gray_00.with_alpha(48);
+      let black_pressed = colors.gray_00.with_alpha(96);
+      let white_hover = colors.gray_90.with_alpha(48);
+      let white_pressed = colors.gray_90.with_alpha(16);
+
+      let separator = colors.gray_60;
+
+      Self {
+         text: colors.gray_00,
+         panel: colors.gray_80,
+         separator,
+         error: colors.red_30,
+
+         button: ButtonColors {
+            fill: Color::TRANSPARENT,
+            outline: colors.gray_50,
+            text: colors.gray_00,
+            hover: black_hover,
+            pressed: black_pressed,
+         },
+         action_button: ButtonColors {
+            fill: Color::TRANSPARENT,
+            outline: Color::TRANSPARENT,
+            text: colors.gray_00,
+            hover: black_hover,
+            pressed: black_pressed,
+         },
+         toolbar_button: ButtonColors {
+            fill: Color::TRANSPARENT,
+            outline: Color::TRANSPARENT,
+            text: colors.gray_20,
+            hover: black_hover,
+            pressed: black_pressed,
+         },
+         selected_toolbar_button: ButtonColors {
+            fill: colors.gray_20,
+            outline: Color::TRANSPARENT,
+            text: colors.gray_80,
+            hover: white_hover,
+            pressed: white_pressed,
+         },
+         radio_button: RadioButtonColors {
+            normal: ButtonColors {
+               fill: Color::TRANSPARENT,
+               outline: colors.gray_50,
+               text: colors.gray_00,
+               hover: black_hover,
+               pressed: black_pressed,
+            },
+            selected: ButtonColors {
+               fill: colors.gray_20,
+               outline: Color::TRANSPARENT,
+               text: colors.gray_80,
+               hover: white_hover,
+               pressed: white_pressed,
+            },
+         },
+         slider: colors.gray_00,
+         expand: ExpandColors {
+            icon: colors.gray_00,
+            text: colors.gray_00,
+            hover: black_hover,
+            pressed: black_pressed,
+         },
+         text_field: TextFieldColors {
+            outline: colors.gray_50,
+            outline_focus: colors.gray_20,
+            fill: colors.gray_90,
+            text: colors.gray_00,
+            text_hint: colors.gray_50,
+            label: colors.gray_00,
+            selection: colors.blue_70,
+         },
+         context_menu: ContextMenuColors {
+            background: colors.gray_80,
+         },
+         window_buttons: WindowButtonsColors {
+            close: WindowButtonColors {
+               normal_fill: Color::TRANSPARENT,
+               normal_icon: colors.gray_00,
+               hover_fill: colors.red_30,
+               hover_icon: colors.gray_90,
+               pressed_fill: colors.red_10,
+               pressed_icon: colors.gray_80,
+            },
+            pin: WindowButtonColors {
+               normal_fill: Color::TRANSPARENT,
+               normal_icon: colors.gray_00,
+               hover_fill: black_hover,
+               hover_icon: colors.gray_00,
+               pressed_fill: black_pressed,
+               pressed_icon: colors.gray_00,
+            },
+            pinned: WindowButtonColors {
+               normal_fill: colors.blue_50,
+               normal_icon: colors.white,
+               hover_fill: colors.blue_70,
+               hover_icon: colors.white,
+               pressed_fill: colors.blue_30,
+               pressed_icon: colors.white,
+            },
+         },
+         drag_handle: colors.gray_60,
+         toolbar: ToolbarColors {
+            position_highlight: colors.blue_50,
+         },
+
+         lobby: LobbyColors {
+            background: colors.blue_50,
+         },
+      }
    }
 }
 
@@ -566,9 +733,6 @@ impl From<CommonColors> for ColorScheme {
 impl From<crate::config::ColorScheme> for ColorScheme {
    fn from(scheme: crate::config::ColorScheme) -> Self {
       use crate::config::ColorScheme;
-      match scheme {
-         ColorScheme::Light => Self::light(),
-         ColorScheme::Dark => Self::dark(),
-      }
+      Self::wallhackd()
    }
 }

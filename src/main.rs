@@ -66,6 +66,7 @@ use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{EnvFilter, Layer};
 use web_time::{Duration, Instant};
+use whd_common::{WALLHACKD_VERSION, WALLHACKD_YEAR};
 
 use crate::backend::UiRenderFrame;
 
@@ -120,7 +121,7 @@ async fn inner_main(language: &mut Option<Language>) -> errors::Result<()> {
       let window_builder = {
          let b = WindowBuilder::new()
             .with_inner_size(PhysicalSize::<u32>::new(1024, 600))
-            .with_title("NetCanv")
+            .with_title(format!("NetCanv WallhackD ({}) ({})", WALLHACKD_VERSION, WALLHACKD_YEAR))
             .with_resizable(true);
          if let Some(window) = &config().window {
             b.with_inner_size(PhysicalSize::new(window.width, window.height))

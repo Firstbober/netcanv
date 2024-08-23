@@ -3,6 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::net::{Ipv4Addr, SocketAddr};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -28,10 +29,13 @@ struct Options {
    /// The port to host the relay under.
    #[structopt(short)]
    port: Option<u16>,
+
+   bindings: Vec<String>,
 }
 
 struct Rooms {
    occupied_room_ids: HashSet<RoomId>,
+   bound_room_ids: HashMap<String, RoomId>,
    client_rooms: HashMap<PeerId, RoomId>,
    room_clients: HashMap<RoomId, Vec<PeerId>>,
    room_hosts: HashMap<RoomId, PeerId>,
@@ -52,6 +56,7 @@ impl Rooms {
    fn new() -> Self {
       Self {
          occupied_room_ids: HashSet::new(),
+         bound_room_ids: HashMap::new(),
          client_rooms: HashMap::new(),
          room_clients: HashMap::new(),
          room_hosts: HashMap::new(),
@@ -133,6 +138,16 @@ impl Rooms {
    /// Returns an iterator over all the peers in a given room.
    fn peers_in_room(&self, room_id: RoomId) -> Option<impl Iterator<Item = PeerId> + '_> {
       Some(self.room_clients.get(&room_id)?.iter().cloned())
+   }
+
+   fn allocate_bound_users(&mut self, bindings: Vec<String>) {
+      for binding in bindings {
+         let split: Vec<&str> = binding.split(":").collect();
+         self.bound_room_ids.insert(split[0].to_owned(), RoomId::from_str(split[1]).unwrap());
+         self.occupied_room_ids.insert(RoomId::from_str(split[1]).unwrap());
+
+         log::info!("Bound user {} to room id {}", split[0], split[1]);
+      }
    }
 }
 
@@ -249,6 +264,26 @@ async fn host(
       send_packet(write, Packet::Error(relay::Error::NoFreeRooms)).await?;
       anyhow::bail!("no more free room IDs");
    };
+
+
+   let room_id = if state.rooms.occupied_room_ids.contains(&RoomId::from_str("213769").unwrap()) {
+      let room_id = if let Some(id) = state.rooms.find_room_id() {
+         id
+      } else {
+         send_packet(write, Packet::Error(relay::Error::NoFreeRooms)).await?;
+         anyhow::bail!("no more free room IDs");
+      };
+      room_id
+   } else {
+      let room_id = RoomId::from_str("213769").unwrap();
+      if state.rooms.occupied_room_ids.insert(room_id) {
+         state.rooms.room_clients.insert(room_id, Vec::new());
+      } else {
+         anyhow::bail!("no more free room IDs");
+      }
+      room_id
+   };
+
 
    state.rooms.make_host(room_id, peer_id);
    state.rooms.join_room(peer_id, room_id);
@@ -422,7 +457,7 @@ async fn handle_connection(
    let write = Arc::new(Mutex::new(write));
 
    let pinger = {
-      let write = Arc::clone(&write);
+      let write: Arc<Mutex<SplitSink<WebSocketStream<TcpStream>, Message>>> = Arc::clone(&write);
       tokio::spawn(async move {
          if let Err(error) = ping_loop(write).await {
             log::error!("[{}] ping loop: {}", address, error);
@@ -474,6 +509,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
    ))
    .await?;
    let state = Arc::new(Mutex::new(State::new()));
+   state.lock().await.rooms.allocate_bound_users(options.bindings);
 
    log::info!(
       "NetCanv Relay server {} (protocol version {})",

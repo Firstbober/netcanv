@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use nysa::global as bus;
@@ -8,15 +9,14 @@ use crate::backend::Backend;
 use crate::cli;
 use crate::common::{Error, Fatal};
 use crate::config::config;
-use crate::net::{
-   peer::{self, Peer},
-   socket::SocketSystem,
-};
+use crate::net::peer::{self, Peer};
+use crate::net::socket::SocketSystem;
 
 pub struct State {
    assets: Box<Assets>,
    socket_system: Arc<SocketSystem>,
    peer: Option<Peer>,
+   canvas: Option<PathBuf>
 }
 
 impl State {
@@ -26,24 +26,34 @@ impl State {
       socket_system: Arc<SocketSystem>,
    ) -> Box<dyn AppState> {
       match cli.command {
-         Some(cli::Commands::HostRoom) => {
+         Some(cli::Commands::HostRoom {
+            nickname,
+            load_canvas,
+            relay_address,
+         }) => {
             let peer = Some(Peer::host(
                Arc::clone(&socket_system),
-               &config().lobby.nickname,
-               &config().lobby.relay,
+               nickname.unwrap_or(config().lobby.nickname.to_owned()).as_str(),
+               relay_address.unwrap_or(config().lobby.relay.to_owned()).as_str(),
             ));
 
             Box::new(Self {
                assets,
                socket_system,
                peer,
+               canvas: load_canvas
             })
          }
-         Some(cli::Commands::JoinRoom { room_id }) => {
+         Some(cli::Commands::JoinRoom {
+            room_id,
+            save_canvas,
+            nickname,
+            relay_address,
+         }) => {
             let peer = Some(Peer::join(
                Arc::clone(&socket_system),
-               &config().lobby.nickname,
-               &config().lobby.relay,
+               nickname.unwrap_or(config().lobby.nickname.to_owned()).as_str(),
+               relay_address.unwrap_or(config().lobby.relay.to_owned()).as_str(),
                room_id,
             ));
 
@@ -51,6 +61,7 @@ impl State {
                assets,
                socket_system,
                peer,
+               canvas: save_canvas
             })
          }
          _ => Box::new(lobby::State::new(assets, Arc::clone(&socket_system))),
@@ -93,7 +104,7 @@ impl AppState for State {
             this.assets,
             this.socket_system,
             this.peer.unwrap(),
-            None,
+            this.canvas.clone(),
             renderer,
          ) {
             Ok(state) => Box::new(state),
@@ -103,6 +114,7 @@ impl AppState for State {
                   assets,
                   socket_system,
                   peer: None,
+                  canvas: this.canvas.clone()
                })
             }
          }

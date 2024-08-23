@@ -19,11 +19,29 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
    /// Host room when started
-   HostRoom,
+   HostRoom {
+      #[clap(long)]
+      relay_address: Option<String>,
+
+      #[clap(long)]
+      nickname: Option<String>,
+
+      #[clap(long)]
+      load_canvas: Option<PathBuf>,
+   },
    /// Join room when started
    JoinRoom {
       /// Room ID used for joining the room
       #[arg(short, long, value_parser = clap::value_parser!(RoomId))]
       room_id: RoomId,
+
+      #[clap(long)]
+      relay_address: Option<String>,
+
+      #[clap(long)]
+      nickname: Option<String>,
+
+      #[clap(long)]
+      save_canvas: Option<PathBuf>,
    },
 }
