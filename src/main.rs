@@ -1,5 +1,5 @@
 // NetCanv - online collaborative paint canvas
-// Copyright 2021-2022, liquidev
+// Copyright 2021-2024 liquidev, 2024-today NetCanv contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ use crate::net::socket::SocketSystem;
 use crate::ui::view::{self, View};
 use backend::Backend;
 use clap::Parser;
-use native_dialog::{MessageDialog, MessageType};
+use rfd::{MessageDialog, MessageLevel};
 use netcanv_i18n::translate_enum::TranslateEnum;
 use netcanv_i18n::{Formatted, Language};
 use netcanv_renderer::paws::{vector, Layout};
@@ -286,10 +286,9 @@ async fn async_main() {
          );
          MessageDialog::new()
             .set_title("NetCanv - Error")
-            .set_text(&message)
-            .set_type(MessageType::Error)
-            .show_alert()
-            .unwrap();
+            .set_description(&message)
+            .set_level(MessageLevel::Error)
+            .show();
       }
    }
 }
@@ -307,12 +306,12 @@ fn main() {
       {
          let mut message = heapless::String::<8192>::new();
          let _ = write!(message, "Oh no! A fatal error occured.\n{}", panic_info);
-         let _ = write!(message, "\n\nThis is most definitely a bug, so please file an issue on GitHub. https://github.com/liquidev/netcanv");
+         let _ = write!(message, "\n\nThis is most definitely a bug, so please file an issue on GitHub. https://github.com/netcanv/netcanv");
          let _ = MessageDialog::new()
             .set_title("NetCanv - Fatal Error")
-            .set_text(&message)
-            .set_type(MessageType::Error)
-            .show_alert();
+            .set_description(message.to_string())
+            .set_level(MessageLevel::Error)
+            .show();
       }
       default_panic_hook(panic_info);
    }));
